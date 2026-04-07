@@ -3,11 +3,6 @@
  * 功能：通过GitHub API读取和修改仓库中的Wiki数据
  */
 
-// 确保 app 对象存在（在独立使用时）
-if (typeof app === 'undefined') {
-    window.app = {};
-}
-
 // ========== GitHub 存储管理器 ==========
 app.githubStorage = {
     // 配置

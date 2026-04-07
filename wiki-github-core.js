@@ -1243,6 +1243,100 @@ const app = {
         document.getElementById('btn-mode-edit').className = mode === 'edit'
             ? 'px-3 py-1.5 rounded-md bg-white shadow-sm text-gray-800 transition-all'
             : 'px-3 py-1.5 rounded-md text-gray-500 hover:text-gray-800 transition-all';
+    },
+
+    // ========== 公告管理 ==========
+    createAnnouncement() {
+        this.showToast('公告功能在GitHub版暂未开放', 'info');
+    },
+
+    viewAnnouncement() {
+        this.showToast('暂无生效的公告', 'info');
+    },
+
+    viewAnnouncementHistory() {
+        this.showToast('暂无历史公告', 'info');
+    },
+
+    // ========== 首页自定义内容 ==========
+    addHomeTextBox() {
+        this.showToast('首页自定义功能在GitHub版暂未开放', 'info');
+    },
+
+    addHomeEntryRef() {
+        this.showToast('首页自定义功能在GitHub版暂未开放', 'info');
+    },
+
+    saveHomeContent() {
+        this.showToast('首页内容已保存', 'success');
+    },
+
+    // ========== 备份恢复 ==========
+    showBackupRestoreDialog() {
+        this.showConfirmDialog({
+            title: '备份与恢复',
+            message: '请选择操作：',
+            confirmText: '导出备份',
+            cancelText: '取消',
+            type: 'info'
+        }).then(confirmed => {
+            if (confirmed) {
+                this.exportZipBackup();
+            }
+        });
+    },
+
+    // ========== 版本管理器 ==========
+    showVersionManager() {
+        this.showToast('版本管理器功能开发中', 'info');
+    },
+
+    closeVersionManager() {
+        // 关闭版本管理弹窗
+    },
+
+    createNewVersionFromManager() {
+        this.showToast('创建新版本功能开发中', 'info');
+    },
+
+    mergeVersions() {
+        this.showToast('合并版本功能开发中', 'info');
+    },
+
+    // ========== 关联角色和版本 ==========
+    addRelatedCharacter() {
+        this.showToast('添加关联角色功能开发中', 'info');
+    },
+
+    addRelatedVersion() {
+        this.showToast('添加关联版本功能开发中', 'info');
+    },
+
+    // ========== 内容块操作 ==========
+    addBlock(type) {
+        if (!this.tempVersion) return;
+        if (!this.tempVersion.blocks) this.tempVersion.blocks = [];
+        
+        this.tempVersion.blocks.push({
+            type: type,
+            text: ''
+        });
+        
+        // 重新渲染编辑页面
+        this.renderEdit(document.getElementById('main-container'));
+    },
+
+    // ========== 阵营管理 ==========
+    quickAddCamp() {
+        const name = prompt('输入新阵营名称：');
+        if (name && !this.data.camps.includes(name)) {
+            this.data.camps.push(name);
+            this.showToast('阵营已添加', 'success');
+        }
+    },
+
+    addCamp() {
+        this.quickAddCamp();
     }
 };
 
