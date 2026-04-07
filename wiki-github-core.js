@@ -272,12 +272,16 @@ const app = {
 
     // ========== 根据模式更新UI ==========
     updateUIForMode() {
-        // 更新模式徽章
+        // 更新模式徽章（仅后台模式显示）
         const badge = document.getElementById('mode-badge');
         if (badge) {
-            badge.classList.remove('hidden');
-            badge.className = `mode-badge ${this.runMode}`;
-            badge.textContent = this.runMode === 'backend' ? '后台模式' : '前台模式';
+            if (this.runMode === 'backend') {
+                badge.classList.remove('hidden');
+                badge.className = 'mode-badge backend';
+                badge.textContent = '后台模式';
+            } else {
+                badge.classList.add('hidden');
+            }
         }
         
         // 显示/隐藏编辑相关元素
@@ -743,6 +747,157 @@ const app = {
         a.click();
         URL.revokeObjectURL(url);
         this.showToast('备份已导出', 'success');
+    },
+
+    // ========== 数据导入 ==========
+    async handleImportFolder(input) {
+        const files = input.files;
+        if (!files || files.length === 0) {
+            this.showImportStatus('请选择文件夹', 'error');
+            return;
+        }
+
+        const statusEl = document.getElementById('import-status');
+        this.showImportStatus('正在读取文件...', 'info');
+
+        // 查找 data.json 文件
+        let dataFile = null;
+        const imageFiles = [];
+
+        for (const file of files) {
+            const path = file.webkitRelativePath || file.name;
+            // 支持 "Wiki数据/data.json" 或直接 "data.json"
+            if (path.endsWith('data.json') && !path.includes('/wiki-images/')) {
+                dataFile = file;
+            }
+            // 收集图片文件（在 wiki-images 文件夹中）
+            if (path.includes('/wiki-images/') && file.type.startsWith('image/')) {
+                imageFiles.push(file);
+            }
+        }
+
+        if (!dataFile) {
+            this.showImportStatus('未找到 data.json 文件，请确保选择了正确的"Wiki数据"文件夹', 'error');
+            return;
+        }
+
+        try {
+            // 读取并解析 data.json
+            const dataText = await dataFile.text();
+            const importedData = JSON.parse(dataText);
+
+            // 验证数据结构
+            if (!importedData.entries || !Array.isArray(importedData.entries)) {
+                this.showImportStatus('数据格式不正确：缺少 entries 数组', 'error');
+                return;
+            }
+
+            this.showImportStatus(`找到 ${importedData.entries.length} 个词条，${imageFiles.length} 张图片，正在导入...`, 'info');
+
+            // 合并数据（保留现有数据，添加新数据）
+            const existingIds = new Set(this.data.entries.map(e => e.id));
+            let addedCount = 0;
+            let skippedCount = 0;
+
+            for (const entry of importedData.entries) {
+                if (!existingIds.has(entry.id)) {
+                    this.data.entries.push(entry);
+                    addedCount++;
+                } else {
+                    skippedCount++;
+                }
+            }
+
+            // 合并其他数据（章节、阵营、剧情梗概等）
+            if (importedData.chapters && importedData.chapters.length > 0) {
+                const existingChapterIds = new Set(this.data.chapters.map(c => c.id));
+                for (const chapter of importedData.chapters) {
+                    if (!existingChapterIds.has(chapter.id)) {
+                        this.data.chapters.push(chapter);
+                    }
+                }
+            }
+
+            if (importedData.camps && importedData.camps.length > 0) {
+                for (const camp of importedData.camps) {
+                    if (!this.data.camps.includes(camp)) {
+                        this.data.camps.push(camp);
+                    }
+                }
+            }
+
+            if (importedData.synopsis && importedData.synopsis.length > 0) {
+                const existingSynopsisIds = new Set(this.data.synopsis.map(s => s.id));
+                for (const syn of importedData.synopsis) {
+                    if (!existingSynopsisIds.has(syn.id)) {
+                        this.data.synopsis.push(syn);
+                    }
+                }
+            }
+
+            // 导入标题和副标题（如果当前为空）
+            if (importedData.wikiTitle && !this.data.wikiTitle) {
+                this.data.wikiTitle = importedData.wikiTitle;
+            }
+            if (importedData.wikiSubtitle && !this.data.wikiSubtitle) {
+                this.data.wikiSubtitle = importedData.wikiSubtitle;
+            }
+
+            // 上传图片到 GitHub
+            let uploadedImages = 0;
+            if (imageFiles.length > 0) {
+                for (const imgFile of imageFiles) {
+                    try {
+                        const reader = new FileReader();
+                        const dataUrl = await new Promise((resolve, reject) => {
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(imgFile);
+                        });
+
+                        await this.githubStorage.saveImage(imgFile.name, dataUrl);
+                        uploadedImages++;
+                    } catch (e) {
+                        console.warn('图片上传失败:', imgFile.name, e);
+                    }
+                }
+            }
+
+            // 保存到 GitHub
+            await this.githubStorage.saveWikiData(this.data);
+
+            this.showImportStatus(
+                `导入成功！新增 ${addedCount} 个词条${skippedCount > 0 ? `（跳过 ${skippedCount} 个重复）` : ''}，上传 ${uploadedImages}/${imageFiles.length} 张图片`,
+                'success'
+            );
+
+            // 刷新页面显示
+            this.updateUIForMode();
+            this.showToast('数据导入成功', 'success');
+
+        } catch (error) {
+            console.error('导入失败:', error);
+            this.showImportStatus('导入失败: ' + error.message, 'error');
+        }
+
+        // 清空 input 以便下次选择同一文件夹
+        input.value = '';
+    },
+
+    showImportStatus(message, type) {
+        const statusEl = document.getElementById('import-status');
+        if (!statusEl) return;
+
+        statusEl.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-blue-100', 'text-blue-700');
+
+        const colors = {
+            success: ['bg-green-100', 'text-green-700'],
+            error: ['bg-red-100', 'text-red-700'],
+            info: ['bg-blue-100', 'text-blue-700']
+        };
+
+        statusEl.classList.add(...(colors[type] || colors.info));
+        statusEl.textContent = message;
     },
 
     // ========== 字体设置 ==========

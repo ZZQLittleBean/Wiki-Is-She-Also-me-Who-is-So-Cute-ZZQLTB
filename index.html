@@ -172,20 +172,16 @@
             margin: 0 auto;
         }
 
-        /* 模式切换 */
+        /* 模式切换 - 仅后台模式显示，位置下移避免遮挡 */
         .mode-badge {
             position: fixed;
-            top: 10px;
+            top: 70px;
             right: 10px;
             z-index: 100;
             padding: 6px 12px;
             border-radius: 20px;
             font-size: 12px;
             font-weight: 600;
-        }
-        .mode-badge.frontend {
-            background: #dbeafe;
-            color: #1e40af;
         }
         .mode-badge.backend {
             background: #fce7f3;
@@ -534,6 +530,27 @@
                         <button onclick="app.disconnectGitHub()" class="w-full py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition">
                             断开连接
                         </button>
+                    </div>
+                </div>
+
+                <!-- 后台模式：数据导入 -->
+                <div class="edit-only hidden bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-file-import text-green-600"></i> 数据导入
+                    </h2>
+                    <div class="space-y-3">
+                        <p class="text-xs text-gray-500">
+                            <i class="fa-solid fa-info-circle mr-1"></i>
+                            选择"Wiki数据"文件夹（包含 data.json 和 wiki-images 文件夹）
+                        </p>
+                        <input type="file" id="import-folder" webkitdirectory directory multiple 
+                            class="hidden" onchange="app.handleImportFolder(this)">
+                        <button onclick="document.getElementById('import-folder').click()" 
+                            class="w-full py-2 bg-green-50 text-green-600 rounded-lg text-sm hover:bg-green-100 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-folder-open"></i>
+                            选择Wiki数据文件夹
+                        </button>
+                        <div id="import-status" class="hidden text-xs text-center py-2 rounded-lg"></div>
                     </div>
                 </div>
 
