@@ -356,5 +356,5 @@
         }
     };
 
-    console.log('GitHub Storage Manager v2.0 加载完成');
+    console.log('GitHub Storage Manager v2.6 加载完成');
 })();
