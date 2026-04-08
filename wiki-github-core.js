@@ -119,6 +119,7 @@ Object.assign(window.app, {
     // ========== 初始化 ==========
     init() {
         this.githubStorage = window.WikiGitHubStorage;
+        this.confirmedFutureEntries = new Set();
         
         // 检查是否有保存的后台登录状态
         const savedLogin = localStorage.getItem('wiki_backend_login');
@@ -660,13 +661,25 @@ Object.assign(window.app, {
     renderDetail(container) {
         const entry = this.data.entries.find(e => e.id === this.data.editingId);
         if (!entry) {
-            container.innerHTML = '<div class="p-4 text-red-600">条目不存在</div>';
+            container.innerHTML = '<div class="p-4 text-red-600">条目不存在或已被删除</div>';
             return;
         }
         
-        const version = this.getVisibleVersion(entry) || entry.versions?.[entry.versions.length - 1];
+        let version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || 
+                    this.getVisibleVersion(entry) || 
+                    entry.versions[entry.versions.length - 1];
+        
         if (!version) {
-            container.innerHTML = '<div class="p-4 text-red-600">该条目没有内容</div>';
+            container.innerHTML = '<div class="p-4 text-red-600">该条目没有内容版本</div>';
+            return;
+        }
+        
+        const timeStatus = this.getVersionTimeStatus(entry, version);
+        
+        // Layer 2: 检查是否需要显示未来警告
+        const confirmKey = `${entry.id}_${version.vid}`;
+        if (timeStatus === 'future' && !(this.confirmedFutureEntries && this.confirmedFutureEntries.has(confirmKey))) {
+            this.showFutureConfirmDialog(entry, version, confirmKey);
             return;
         }
         
@@ -675,70 +688,142 @@ Object.assign(window.app, {
         
         const clone = tpl.content.cloneNode(true);
         
-        clone.getElementById('detail-code').textContent = entry.code;
-        
-        clone.querySelectorAll('.edit-only').forEach(el => {
-            el.classList.toggle('hidden', this.runMode !== 'backend');
-        });
-        
+        const codeEl = clone.getElementById('detail-code');
+        const versionBadge = clone.getElementById('detail-version-badge');
+        const versionName = clone.getElementById('detail-version-name');
         const contentEl = clone.getElementById('detail-content');
         
-        let contentHtml = `
-            <div class="flex flex-col md:flex-row gap-6 mb-6">
-                <div class="flex-1">
-                    <h1 class="text-3xl font-bold text-gray-900 mb-3">${version.title}</h1>
-                    ${version.subtitle ? `<p class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4">${version.subtitle}</p>` : ''}
-                </div>
-        `;
+        if (codeEl) codeEl.textContent = entry.code;
         
-        const img = version.images?.card || version.images?.avatar || version.image;
-        if (img) {
-            contentHtml += `
-                <div class="w-48 shrink-0">
-                    <div class="aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-gray-100">
-                        <img src="${img}" class="w-full h-full object-cover" alt="${version.title}">
-                    </div>
-                </div>
-            `;
+        if (versionBadge && versionName && entry.versions.length > 1) {
+            versionBadge.classList.remove('hidden');
+            const vIndex = entry.versions.findIndex(v => v.vid === version.vid);
+            versionName.textContent = `版本 ${vIndex + 1}/${entry.versions.length}`;
         }
         
-        contentHtml += '</div>';
+        // 处理图片引用（支持 {{IMG:filename}} 格式）
+        let cardImg = version.images?.card || version.images?.avatar || version.image;
+        if (cardImg && cardImg.startsWith('{{IMG:')) {
+            const match = cardImg.match(/\{\{IMG:(.+?)\}\}/);
+            if (match && this.storageManager) {
+                const cached = this.storageManager.memoryCache && this.storageManager.memoryCache.get(match[1]);
+                if (cached) cardImg = cached;
+            }
+        }
+        const hasImage = cardImg && (cardImg.startsWith('data:') || cardImg.startsWith('blob:') || cardImg.startsWith('http'));
         
-        contentHtml += '<div class="prose prose-sm max-w-none">';
+        // 标题区域
+        let headerHtml = `
+            <div class="flex-1 min-w-0">
+                <h1 class="text-3xl font-bold text-gray-900 mb-3 leading-tight">${version.title}</h1>
+                ${version.subtitle ? `<div class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4 whitespace-pre-line leading-relaxed">${version.subtitle}</div>` : ''}
+            </div>
+        `;
+        
+        // 图片区域
+        const imageHtml = hasImage ? `
+            <div class="w-56 shrink-0">
+                <div class="aspect-[3/4] rounded-xl overflow-hidden shadow-lg bg-gray-100 border border-gray-200 sticky top-24">
+                    <img src="${cardImg}" class="w-full h-full object-cover" 
+                        onerror="this.style.display='none'; this.parentElement.innerHTML='<div class=\\'w-full h-full flex items-center justify-center text-gray-300\\'><i class=\\'fa-solid fa-image text-4xl\\'></i></div>'" 
+                        alt="${version.title}">
+                </div>
+                ${entry.level <= 2 ? `
+                    <div class="text-center mt-3">
+                        <span class="inline-block px-4 py-1.5 ${entry.level === 1 ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : 'bg-blue-100 text-blue-800 border-blue-200'} border rounded-full text-sm font-bold">
+                            ${entry.level === 1 ? '★ 主角' : '重要角色'}
+                        </span>
+                    </div>
+                ` : ''}
+            </div>
+        ` : '';
+        
+        // 正文内容 - 支持角色引用和剧情梗概引用
+        let contentBlocksHtml = '<div class="prose prose-sm max-w-none mt-6">';
         if (version.blocks && version.blocks.length > 0) {
             version.blocks.forEach(block => {
                 if (block.type === 'h2') {
-                    contentHtml += `<h2 class="text-xl font-bold text-gray-800 mt-8 mb-4 border-b pb-2">${block.text}</h2>`;
+                    contentBlocksHtml += `<h2 class="text-xl font-bold text-gray-800 mt-8 mb-4 border-b pb-2">${block.text}</h2>`;
                 } else if (block.type === 'h3') {
-                    contentHtml += `<h3 class="text-lg font-bold text-gray-700 mt-6 mb-3">${block.text}</h3>`;
-                } else {
+                    contentBlocksHtml += `<h3 class="text-lg font-bold text-gray-700 mt-6 mb-3">${block.text}</h3>`;
+                } else if (block.type === 'p') {
                     let text = block.text || '';
+                    // 支持词条链接 [[名称]]
                     text = text.replace(/\[\[(.*?)\]\]/g, '<a href="#" onclick="app.searchAndOpen(\'$1\'); return false;" class="text-indigo-600 hover:underline">$1</a>');
-                    contentHtml += `<p class="text-gray-600 leading-relaxed mb-4 break-all">${text}</p>`;
+                    // 支持剧情梗概引用 {{synopsis:chapterId:title}}
+                    text = text.replace(/\{\{synopsis:([^:]+):([^}]+)\}\}/g, (match, chapterId, title) => {
+                        return `<span class="synopsis-ref-inline cursor-pointer text-indigo-600 font-medium border-b-2 border-indigo-300 hover:bg-indigo-50 px-1 rounded transition" onclick="app.router('synopsis')"><i class="fa-solid fa-film text-xs mr-1"></i>${title}</span>`;
+                    });
+                    // 支持角色引用 @名称[代码]（通常在剧情梗概中使用，但词条内也可能引用）
+                    text = text.replace(/@([^\[]+)\[([^\]]+)\]/g, '<span class="synopsis-entry-ref" data-entry-code="$2" onclick="app.openEntryByCode(\'$2\')" onmouseenter="app.handleSynopsisRefHover(this)" onmouseleave="app.handleSynopsisRefLeave(this)"><i class="fa-solid fa-user"></i>$1</span>');
+                    
+                    // 关键修复：添加break-all实现长文本自动换行
+                    contentBlocksHtml += `<p class="text-gray-600 leading-relaxed mb-4 break-all" style="word-break: break-all; overflow-wrap: break-word;">${text}</p>`;
                 }
             });
+        } else {
+            contentBlocksHtml += '<div class="text-gray-400 italic">暂无详细内容</div>';
         }
-        contentHtml += '</div>';
+        contentBlocksHtml += '</div>';
         
-        if (entry.versions.length > 1) {
-            contentHtml += `
-                <div class="mt-8 pt-6 border-t border-gray-200">
-                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">版本切换</h3>
-                    <div class="flex flex-wrap gap-2">
+        if (contentEl) {
+            contentEl.innerHTML = `
+                <div class="flex flex-col md:flex-row gap-6 mb-2">
+                    ${headerHtml}
+                    ${imageHtml}
+                </div>
+                ${contentBlocksHtml}
             `;
-            entry.versions.forEach((v, idx) => {
-                const isCurrent = v.vid === version.vid;
-                contentHtml += `
-                    <button onclick="app.switchToVersion('${entry.id}', '${v.vid}')" 
-                        class="px-3 py-1.5 rounded-lg text-sm ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
-                        版本 ${idx + 1}: ${v.title}
-                    </button>
-                `;
-            });
-            contentHtml += '</div></div>';
         }
         
-        contentEl.innerHTML = contentHtml;
+        // 相关角色
+        const relatedSection = clone.getElementById('related-characters-section');
+        const relatedList = clone.getElementById('related-characters-list');
+        if (relatedSection && relatedList && version.relatedCharacters && version.relatedCharacters.length > 0) {
+            relatedSection.classList.remove('hidden');
+            version.relatedCharacters.forEach(rc => {
+                const charEntry = this.data.entries.find(e => e.id === rc.charId);
+                if (!charEntry) return;
+                const charVersion = this.getVisibleVersion(charEntry);
+                const tag = document.createElement('span');
+                tag.className = 'inline-flex items-center gap-1 px-3 py-1 bg-gray-100 hover:bg-indigo-100 rounded-full text-xs cursor-pointer transition';
+                tag.innerHTML = `<span class="font-medium">${charVersion && charVersion.title ? charVersion.title : charEntry.code}</span><span class="text-gray-400">·${rc.relationName}</span>`;
+                tag.onclick = () => this.openEntry(charEntry.id);
+                relatedList.appendChild(tag);
+            });
+        }
+        
+        // 版本切换提示
+        const versionHint = clone.getElementById('version-switch-hint');
+        const versionList = clone.getElementById('version-switch-list');
+        if (versionHint && versionList && entry.versions.length > 1) {
+            const otherVersions = entry.versions.filter(v => v.vid !== version.vid);
+            if (otherVersions.length > 0) {
+                versionHint.classList.remove('hidden');
+                otherVersions.forEach(v => {
+                    const vStatus = this.getVersionTimeStatus(entry, v);
+                    const btn = document.createElement('button');
+                    btn.className = `text-xs px-3 py-1 rounded-full border transition ${vStatus === 'current' ? 'bg-indigo-100 border-indigo-300 text-indigo-700' : 'bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100'}`;
+                    btn.innerHTML = `${v.title} ${vStatus !== 'current' ? `<span class="text-[10px] opacity-70">(${vStatus === 'past' ? '过去' : '未来'})</span>` : ''}`;
+                    btn.onclick = () => {
+                        if (vStatus === 'future') {
+                            const vConfirmKey = `${entry.id}_${v.vid}`;
+                            this.data.viewingVersionId = v.vid;
+                            if (this.confirmedFutureEntries && this.confirmedFutureEntries.has(vConfirmKey)) {
+                                this.router('detail', false);
+                            } else {
+                                this.showFutureConfirmDialog(entry, v, vConfirmKey);
+                            }
+                        } else {
+                            this.data.viewingVersionId = v.vid;
+                            this.router('detail', false);
+                        }
+                    };
+                    versionList.appendChild(btn);
+                });
+            }
+        }
+        
         container.appendChild(clone);
     },
 
@@ -868,15 +953,33 @@ Object.assign(window.app, {
 
         let dataFile = null;
         const imageFiles = [];
-
+        // 在导入处理中修改图片保存部分
+        for (const {file, fileName} of imageFiles) {
+            try {
+                const reader = new FileReader();
+                const dataUrl = await new Promise((resolve, reject) => {
+                    reader.onload = () => resolve(reader.result);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+                
+                // 保存到存储，使用原始文件名
+                await this.githubStorage.saveImage(fileName, dataUrl);
+                uploadedImages++;
+            } catch (e) {
+                console.warn('图片上传失败:', fileName, e);
+            }
+        }
         for (const file of files) {
             const path = file.webkitRelativePath || file.name;
             // 支持多种路径格式
             if ((path.endsWith('data.json') || path.endsWith('wiki-manifest.json')) && !path.includes('/wiki-images/')) {
                 dataFile = file;
             }
-            if (path.includes('/wiki-images/') && file.type.startsWith('image/')) {
-                imageFiles.push(file);
+            if ((path.includes('/images/') || path.includes('/wiki-images/')) && file.type.startsWith('image/')) {
+                // 统一文件名处理，去除路径前缀
+                const fileName = file.name;
+                imageFiles.push({file, fileName});
             }
         }
 
@@ -1614,7 +1717,7 @@ Object.assign(window.app, {
                         ${chapter.title}
                     </h3>
                     <div class="prose prose-sm max-w-none text-gray-600 leading-relaxed">
-                        ${chapter.content ? chapter.content.replace(/\n/g, '<br>') : '<p class="text-gray-400 italic">暂无内容</p>'}
+                        ${chapter.content ? this.markdownToHtml(chapter.content) : '<p class="text-gray-400 italic">暂无内容</p>'}
                     </div>
                 `;
                 list.appendChild(item);
@@ -2154,7 +2257,360 @@ Object.assign(window.app, {
                 window.location.reload();
             }
         });
-    }
+    },
+    // ========== 剧情梗概增强功能 ==========
+
+    /**
+     * 渲染剧情梗概查看页面（支持角色引用）
+     */
+    renderSynopsis: function(container) {
+        const tpl = document.getElementById('tpl-synopsis-view');
+        if (!tpl) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-400">剧情梗概模板未找到</div>';
+            return;
+        }
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+        
+        // 同步章节数据
+        this.syncSynopsisWithChapters();
+        
+        const list = document.getElementById('synopsis-view-list');
+        if (!list) return;
+        
+        if (!this.data.synopsis || this.data.synopsis.length === 0) {
+            list.innerHTML = '<div class="text-center py-10 text-gray-400">暂无剧情梗概</div>';
+            return;
+        }
+        
+        this.data.synopsis.forEach(chapter => {
+            const item = document.createElement('div');
+            item.className = 'synopsis-chapter-item bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-4';
+            
+            // 处理图片
+            let imageHtml = '';
+            if (chapter.image) {
+                imageHtml = `
+                    <div class="mb-4 rounded-xl overflow-hidden bg-gray-100">
+                        <img src="${chapter.image}" class="w-full h-48 object-cover" alt="${chapter.title}" 
+                            onerror="this.style.display='none'">
+                    </div>
+                `;
+            }
+            
+            // 处理内容（支持角色引用）
+            const contentHtml = chapter.content ? this.markdownToHtml(chapter.content) : '<p class="text-gray-400 italic">暂无内容</p>';
+            
+            item.innerHTML = `
+                <div class="flex items-center gap-3 mb-4 border-b border-gray-100 pb-3">
+                    <span class="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-sm font-bold">
+                        ${this.formatChapterNum(chapter.num)}
+                    </span>
+                    <h3 class="text-xl font-bold text-gray-800">${chapter.title}</h3>
+                </div>
+                ${imageHtml}
+                <div class="prose prose-sm max-w-none text-gray-600 leading-relaxed synopsis-content">
+                    ${contentHtml}
+                </div>
+            `;
+            
+            list.appendChild(item);
+        });
+    },
+
+    /**
+     * Markdown转HTML（支持角色引用 @名称[代码]）
+     */
+    markdownToHtml: function(text) {
+        if (!text) return '';
+        
+        // 处理角色引用 @名称[代码]
+        // 注意：不显示代码，只显示名称
+        text = text.replace(/@([^\[]+)\[([^\]]+)\]/g, '<span class="synopsis-entry-ref" data-entry-code="$2" onclick="app.openEntryByCode(\'$2\')" onmouseenter="app.handleSynopsisRefHover(this)" onmouseleave="app.handleSynopsisRefLeave(this)"><i class="fa-solid fa-user"></i>$1</span>');
+        
+        // 处理粗体、斜体
+        text = text.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        text = text.replace(/\*(.+?)\*/g, '<em>$1</em>');
+        text = text.replace(/__(.+?)__/g, '<u>$1</u>');
+        
+        // 处理词条链接 [[名称]]
+        text = text.replace(/\[\[(.+?)\]\]/g, '<a href="#" onclick="app.searchAndOpen(\'$1\'); return false;" class="text-indigo-600 hover:underline">$1</a>');
+        
+        return text.replace(/\n/g, '<br>');
+    },
+
+    /**
+     * 通过代码打开词条
+     */
+    openEntryByCode: function(code) {
+        // 清理转义字符
+        const cleanCode = code.replace(/\\/g, '');
+        const entry = this.data.entries.find(e => e.code === cleanCode);
+        if (entry) {
+            this.openEntry(entry.id);
+        } else {
+            this.showToast('未找到该角色: ' + cleanCode, 'warning');
+        }
+    },
+
+    /**
+     * 处理角色引用悬停（显示预览弹窗）
+     */
+    handleSynopsisRefHover: function(element) {
+        const code = element.getAttribute('data-entry-code');
+        if (!code) return;
+        
+        const entry = this.data.entries.find(e => e.code === code.replace(/\\/g, ''));
+        if (!entry) return;
+        
+        const version = this.getVisibleVersion(entry);
+        if (!version) return;
+        
+        // 移除已存在的弹窗
+        this.closeSynopsisTooltip();
+        
+        // 创建弹窗
+        const popup = document.createElement('div');
+        popup.className = 'synopsis-hover-popup';
+        popup.id = 'synopsis-hover-popup';
+        
+        // 获取图片
+        let imgUrl = version.images?.avatar || version.images?.card || '';
+        if (imgUrl && imgUrl.startsWith('{{IMG:')) {
+            const match = imgUrl.match(/\{\{IMG:(.+?)\}\}/);
+            if (match) {
+                // 尝试从内存缓存获取
+                if (this.storageManager && this.storageManager.memoryCache.has(match[1])) {
+                    imgUrl = this.storageManager.memoryCache.get(match[1]);
+                }
+            }
+        }
+        
+        const hasImage = imgUrl && (imgUrl.startsWith('data:') || imgUrl.startsWith('blob:') || imgUrl.startsWith('http'));
+        
+        popup.innerHTML = `
+            <div class="flex gap-3">
+                ${hasImage ? `
+                    <div class="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                        <img src="${imgUrl}" class="w-full h-full object-cover" onerror="this.style.display='none'">
+                    </div>
+                ` : ''}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs font-mono text-gray-500">${entry.code}</span>
+                        ${entry.camp ? `<span class="text-[10px] px-2 py-0.5 bg-gray-100 rounded text-gray-600">${entry.camp}</span>` : ''}
+                    </div>
+                    <h4 class="font-bold text-gray-800 text-lg leading-tight mb-1">${version.title}</h4>
+                    <p class="text-xs text-gray-500 line-clamp-2">${version.subtitle || ''}</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(popup);
+        
+        // 定位弹窗（在元素上方居中）
+        const rect = element.getBoundingClientRect();
+        const popupRect = popup.getBoundingClientRect();
+        
+        let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+        let top = rect.top - popupRect.height - 10;
+        
+        // 边界检查
+        if (left < 10) left = 10;
+        if (left + popupRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - popupRect.width - 10;
+        }
+        if (top < 10) top = rect.bottom + 10; // 如果上方空间不足，显示在下方
+        
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+        popup.style.bottom = 'auto';
+        
+        // 显示动画
+        requestAnimationFrame(() => {
+            popup.classList.add('show');
+        });
+        
+        // 添加背景遮罩（可选，根据需要）
+        document.body.classList.add('body-dimmed');
+    },
+
+    /**
+     * 处理鼠标离开
+     */
+    handleSynopsisRefLeave: function(element) {
+        // 延迟关闭，以便鼠标可以移动到弹窗上
+        setTimeout(() => {
+            const popup = document.getElementById('synopsis-hover-popup');
+            if (popup && !popup.matches(':hover')) {
+                this.closeSynopsisTooltip();
+            }
+        }, 100);
+    },
+
+    /**
+     * 关闭悬停提示
+     */
+    closeSynopsisTooltip: function() {
+        const popup = document.getElementById('synopsis-hover-popup');
+        if (popup) {
+            popup.remove();
+        }
+        document.body.classList.remove('body-dimmed');
+    },
+
+    /**
+     * 同步剧情梗概与章节
+     */
+    syncSynopsisWithChapters: function() {
+        if (!this.data.synopsis) this.data.synopsis = [];
+        
+        const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+        const existingSynopsis = {};
+        this.data.synopsis.forEach(s => { existingSynopsis[s.chapterId || s.id] = s; });
+        
+        const newSynopsis = [];
+        sortedChapters.forEach(ch => {
+            const key = ch.id;
+            if (existingSynopsis[key]) {
+                // 更新章节信息
+                const syn = existingSynopsis[key];
+                syn.num = ch.num;
+                syn.title = syn.title || ch.title;
+                newSynopsis.push(syn);
+            } else {
+                newSynopsis.push({
+                    id: 'syn-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                    chapterId: ch.id,
+                    num: ch.num,
+                    title: ch.title || `第${ch.num}章`,
+                    content: '',
+                    image: null
+                });
+            }
+        });
+        
+        this.data.synopsis = newSynopsis;
+    },
+        // ========== 角色引用与悬停预览功能 ==========
+    
+    openEntryByCode(code) {
+        const cleanCode = code.replace(/\\/g, '');
+        const entry = this.data.entries.find(e => e.code === cleanCode);
+        if (entry) {
+            this.openEntry(entry.id);
+        } else {
+            this.showToast('未找到该角色: ' + cleanCode, 'warning');
+        }
+    },
+
+    handleSynopsisRefHover(element) {
+        const code = element.getAttribute('data-entry-code');
+        if (!code) return;
+        
+        const entry = this.data.entries.find(e => e.code === code.replace(/\\/g, ''));
+        if (!entry) return;
+        
+        const version = this.getVisibleVersion(entry);
+        if (!version) return;
+        
+        // 移除已存在的弹窗
+        this.closeSynopsisTooltip();
+        
+        const popup = document.createElement('div');
+        popup.className = 'synopsis-hover-popup';
+        popup.id = 'synopsis-hover-popup';
+        
+        let imgUrl = version.images?.avatar || version.images?.card || '';
+        if (imgUrl && imgUrl.startsWith('{{IMG:')) {
+            const match = imgUrl.match(/\{\{IMG:(.+?)\}\}/);
+            if (match && this.storageManager && this.storageManager.memoryCache.has(match[1])) {
+                imgUrl = this.storageManager.memoryCache.get(match[1]);
+            }
+        }
+        
+        const hasImage = imgUrl && (imgUrl.startsWith('data:') || imgUrl.startsWith('blob:') || imgUrl.startsWith('http'));
+        
+        popup.innerHTML = `
+            <div class="flex gap-3">
+                ${hasImage ? `
+                    <div class="w-16 h-16 rounded-lg overflow-hidden bg-gray-100 shrink-0">
+                        <img src="${imgUrl}" class="w-full h-full object-cover" onerror="this.style.display='none'">
+                    </div>
+                ` : ''}
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="text-xs font-mono text-gray-500">${entry.code}</span>
+                        ${entry.camp ? `<span class="text-[10px] px-2 py-0.5 bg-gray-100 rounded text-gray-600">${entry.camp}</span>` : ''}
+                    </div>
+                    <h4 class="font-bold text-gray-800 text-lg leading-tight mb-1">${version.title}</h4>
+                    <p class="text-xs text-gray-500 line-clamp-2">${version.subtitle || ''}</p>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(popup);
+        
+        // 定位弹窗
+        const rect = element.getBoundingClientRect();
+        const popupRect = popup.getBoundingClientRect();
+        
+        let left = rect.left + (rect.width / 2) - (popupRect.width / 2);
+        let top = rect.top - popupRect.height - 10;
+        
+        // 边界检查
+        if (left < 10) left = 10;
+        if (left + popupRect.width > window.innerWidth - 10) {
+            left = window.innerWidth - popupRect.width - 10;
+        }
+        if (top < 10) top = rect.bottom + 10;
+        
+        popup.style.left = left + 'px';
+        popup.style.top = top + 'px';
+        popup.style.bottom = 'auto';
+        
+        requestAnimationFrame(() => popup.classList.add('show'));
+        document.body.classList.add('body-dimmed');
+    },
+
+    handleSynopsisRefLeave(element) {
+        setTimeout(() => {
+            const popup = document.getElementById('synopsis-hover-popup');
+            if (popup && !popup.matches(':hover')) {
+                this.closeSynopsisTooltip();
+            }
+        }, 100);
+    },
+
+    closeSynopsisTooltip() {
+        const popup = document.getElementById('synopsis-hover-popup');
+        if (popup) {
+            popup.remove();
+        }
+        document.body.classList.remove('body-dimmed');
+    },
 });
+// 如果 markdownToHtml 未定义，提供兼容实现
+if (!app.markdownToHtml) {
+    app.markdownToHtml = function(text) {
+        if (!text) return '';
+        return text
+            .replace(/@([^\[]+)\[([^\]]+)\]/g, '<span class="synopsis-entry-ref" data-entry-code="$2" onclick="app.openEntryByCode(\'$2\')"><i class="fa-solid fa-user"></i>$1</span>')
+            .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+            .replace(/\*(.+?)\*/g, '<i>$1</i>')
+            .replace(/__(.+?)__/g, '<u>$1</u>')
+            .replace(/\n/g, '<br>');
+    };
+}
+
+if (!app.openEntryByCode) {
+    app.openEntryByCode = function(code) {
+        const entry = app.data.entries.find(e => e.code === code);
+        if (entry) app.openEntry(entry.id);
+        else app.showToast('未找到该角色', 'warning');
+    };
+}
+
 
 console.log('GitHub Wiki Core v2.6 加载完成（修复导入与分享码逻辑）');
