@@ -56,6 +56,73 @@ Object.assign(window.app, {
         redoStack: []
     },
 
+    // ========== 分享码系统 ==========
+    shareCodeSystem: {
+        // 生成随机分享码
+        generateCode() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let code = '';
+            for (let i = 0; i < 8; i++) {
+                code += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            return code;
+        },
+        
+        // 验证分享码格式
+        validateCode(code) {
+            return /^[A-Z0-9]{8}$/.test(code);
+        },
+        
+        // 验证分享码是否有效
+        async verifyCode(code) {
+            const codes = await this.loadShareCodes();
+            return codes.hasOwnProperty(code);
+        },
+        
+        // 加载所有分享码
+        async loadShareCodes() {
+            try {
+                const content = await window.WikiGitHubStorage.getFile('share-codes.json');
+                if (content) {
+                    return JSON.parse(content.content);
+                }
+            } catch (e) {
+                console.warn('无法加载分享码列表:', e);
+            }
+            return {};
+        },
+        
+        // 保存分享码
+        async saveShareCode(code, description = '') {
+            try {
+                const codes = await this.loadShareCodes();
+                codes[code] = {
+                    description,
+                    createdAt: Date.now(),
+                    createdBy: window.app.backendLoggedIn ? 'backend' : 'frontend'
+                };
+                await window.WikiGitHubStorage.putFile('share-codes.json', JSON.stringify(codes, null, 2), 'Add share code');
+                return true;
+            } catch (e) {
+                console.error('保存分享码失败:', e);
+                return false;
+            }
+        },
+        
+        // 删除分享码
+        async deleteCode(code) {
+            try {
+                const codes = await this.loadShareCodes();
+                delete codes[code];
+                await window.WikiGitHubStorage.putFile('share-codes.json', JSON.stringify(codes, null, 2), 'Delete share code');
+                return true;
+            } catch (e) {
+                console.error('删除分享码失败:', e);
+                return false;
+            }
+        }
+    },
+
     // ========== 初始化 ==========
     init() {
         // 绑定 GitHub 存储管理器
