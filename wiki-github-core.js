@@ -929,6 +929,22 @@ Object.assign(window.app, {
                 announcements = importedData.data.announcements;
                 wikiTitle = importedData.wikiTitle || importedData.data.wikiTitle;
                 wikiSubtitle = importedData.wikiSubtitle || importedData.data.wikiSubtitle;
+                // 【新增】格式3：包含 settings 对象的格式（匹配截图结构）
+                entries = importedData.entries;
+                chapters = importedData.chapters;
+                camps = importedData.camps;
+                synopsis = importedData.synopsis;
+                announcements = importedData.announcements;
+                
+                // 从 settings 对象提取配置（对应截图中的结构）
+                if (importedData.settings.name) wikiTitle = importedData.settings.name;
+                if (importedData.settings.subtitle) wikiSubtitle = importedData.settings.subtitle;
+                
+                // 可选：导入其他设置项到 this.data
+                if (importedData.settings.welcomeTitle) this.data.welcomeTitle = importedData.settings.welcomeTitle;
+                if (importedData.settings.welcomeSubtitle) this.data.welcomeSubtitle = importedData.settings.welcomeSubtitle;
+                if (importedData.settings.customFont) this.data.fontFamily = importedData.settings.customFont;
+                if (importedData.settings.homeCustomTitle) this.data.homeCustomTitle = importedData.settings.homeCustomTitle;
             }
 
             // 验证是否找到entries
