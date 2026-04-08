@@ -8,15 +8,6 @@
         // 全局错误捕获
         window.onerror = function(msg, url, line, col, error) {
             console.error('【全局错误捕获】', msg, 'URL:', url, '行:', line, '列:', col);
-            setTimeout(() => {
-                if (document.body && (document.body.innerHTML.trim() === '' || document.body.innerHTML.length < 100)) {
-                    document.body.innerHTML = '<div style="padding:20px;font-family:sans-serif;color:#333;">' +
-                        '<h2 style="color:#dc2626;">页面加载遇到问题</h2>' +
-                        '<p style="color:#666;font-size:14px;">错误：' + msg + '</p>' +
-                        '<button onclick="location.reload()" style="margin-top:20px;padding:8px 16px;background:#4f46e5;color:white;border:none;border-radius:4px;">刷新重试</button>' +
-                        '</div>';
-                }
-            }, 500);
             return false;
         };
         window.addEventListener('unhandledrejection', function(event) {
@@ -24,7 +15,6 @@
         });
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     
@@ -32,8 +22,6 @@
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap');
 
         :root {
-            --hex-width: 140px;
-            --hex-height: 160px;
             --color-primary: #4f46e5;
             --color-bg: #f3f4f6;
             --custom-font: 'Noto Sans SC', sans-serif;
@@ -52,75 +40,6 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* 六边形角色卡片 */
-        .hexagon-wrapper {
-            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.1));
-            transition: all 0.3s ease;
-            cursor: pointer;
-        }
-        .hexagon {
-            width: var(--hex-width);
-            height: var(--hex-height);
-            background-color: white;
-            clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-        }
-        .hexagon.lvl-1 { background: linear-gradient(135deg, #fef3c7, #fde68a); }
-        .hexagon.lvl-2 { background: linear-gradient(135deg, #e0f2fe, #bae6fd); }
-        .hexagon.lvl-3 { background: linear-gradient(135deg, #ffffff, #f3f4f6); }
-        .hexagon.lvl-4 { background: linear-gradient(135deg, #f3f4f6, #e5e7eb); }
-        .hexagon.lvl-5 { background: linear-gradient(135deg, #f9fafb, #f3f4f6); opacity: 0.8; }
-
-        /* 角色徽章 */
-        .role-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            padding: 2px 8px;
-            border-radius: 12px;
-            font-size: 10px;
-            font-weight: bold;
-            z-index: 10;
-        }
-        .badge-protagonist {
-            background: linear-gradient(135deg, #f59e0b, #d97706);
-            color: white;
-        }
-        .badge-important {
-            background: linear-gradient(135deg, #0ea5e9, #0284c7);
-            color: white;
-        }
-
-        /* 版本时间线 */
-        .version-timeline {
-            position: relative;
-            padding-left: 20px;
-        }
-        .version-timeline::before {
-            content: '';
-            position: absolute;
-            left: 6px;
-            top: 0;
-            bottom: 0;
-            width: 2px;
-            background: #e5e7eb;
-        }
-        .version-dot {
-            position: absolute;
-            left: 0;
-            width: 14px;
-            height: 14px;
-            border-radius: 50%;
-            background: white;
-            border: 2px solid #4f46e5;
-            z-index: 10;
-        }
-        .version-dot.active { background: #4f46e5; }
-
         /* 搜索下拉框 */
         .search-dropdown {
             position: absolute;
@@ -135,15 +54,6 @@
             z-index: 1000;
             margin-top: 8px;
             border: 1px solid #e5e7eb;
-        }
-
-        /* 富文本编辑 */
-        .rich-editor {
-            min-height: 60px;
-            outline: none;
-        }
-        .rich-editor:focus {
-            border-color: #4f46e5;
         }
 
         /* 弹窗样式 */
@@ -164,12 +74,6 @@
             width: 100%;
             max-height: 80vh;
             overflow-y: auto;
-        }
-
-        /* 登录表单 */
-        .login-form {
-            max-width: 400px;
-            margin: 0 auto;
         }
 
         /* 模式切换 - 仅后台模式显示，位置下移避免遮挡 */
@@ -202,14 +106,8 @@
 </head>
 <body class="h-screen flex flex-col text-gray-800">
 
-    <!-- 模式徽章 -->
+    <!-- 模式徽章（仅后台模式显示） -->
     <div id="mode-badge" class="mode-badge backend hidden">后台模式</div>
-
-    <!-- 全局状态提示 -->
-    <div id="save-toast" class="fixed top-20 right-4 bg-green-500 text-white px-4 py-2 rounded-lg shadow-lg opacity-0 pointer-events-none flex items-center gap-2 z-[99999] transition-opacity">
-        <i class="fa-solid fa-check-circle"></i>
-        <span>已保存</span>
-    </div>
 
     <!-- 顶部导航 -->
     <header class="bg-white shadow-sm z-50 px-4 py-3 flex justify-between items-center shrink-0">
@@ -219,7 +117,6 @@
             </div>
             <div class="min-w-0">
                 <h1 id="wiki-title-display" class="text-lg font-bold text-gray-900 truncate">未命名 Wiki</h1>
-                <p id="wiki-subtitle-display" class="text-[10px] text-gray-500 truncate hidden">GitHub版</p>
             </div>
         </div>
 
@@ -243,6 +140,11 @@
                     <i class="fa-solid fa-pen sm:mr-1"></i><span class="hidden sm:inline">编辑</span>
                 </button>
             </div>
+
+            <!-- 退出后台模式按钮 -->
+            <button id="logout-backend-btn" onclick="app.logoutBackend()" class="hidden text-gray-500 hover:text-red-600 p-2" title="退出后台模式">
+                <i class="fa-solid fa-sign-out-alt"></i>
+            </button>
         </div>
     </header>
 
@@ -289,7 +191,20 @@
                     <p class="text-gray-500 text-sm mt-2">连接到GitHub仓库以访问Wiki数据</p>
                 </div>
 
-                <div id="login-form" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+                <!-- 登录选项 -->
+                <div id="login-options" class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
+                    <button id="frontend-login-btn" class="w-full py-3 bg-amber-50 text-amber-600 rounded-lg hover:bg-amber-100 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-key"></i>
+                        前台模式（分享码）
+                    </button>
+                    <button id="backend-login-btn" class="w-full py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-lock"></i>
+                        后台模式（密码）
+                    </button>
+                </div>
+
+                <!-- 后台登录表单 -->
+                <div id="backend-login-form" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
                     <div>
                         <label class="block text-xs font-bold text-gray-500 uppercase mb-1">GitHub用户名</label>
                         <input type="text" id="github-owner" class="w-full p-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="例如: yourname">
@@ -310,17 +225,21 @@
                             需要repo权限，<a href="https://github.com/settings/tokens" target="_blank" class="text-indigo-600 hover:underline">在此创建</a>
                         </p>
                     </div>
-                    <button onclick="app.connectToGitHub()" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-link"></i>
-                        连接
-                    </button>
-                    <div class="text-center">
-                        <button onclick="app.enterFrontendMode()" class="text-sm text-gray-500 hover:text-indigo-600 transition">
-                            仅浏览模式（需要分享码）
-                        </button>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">后台密码（可选）</label>
+                        <input type="password" id="backend-password" class="w-full p-3 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="设置密码以记住登录状态">
+                        <p class="text-xs text-gray-400 mt-1">设置密码后，7天内刷新页面无需重新登录</p>
                     </div>
+                    <button onclick="app.loginBackend()" class="w-full py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-link"></i>
+                        连接并进入后台
+                    </button>
+                    <button onclick="app.showLoginOptions()" class="w-full py-2 text-gray-500 hover:text-gray-700 transition text-sm">
+                        返回
+                    </button>
                 </div>
 
+                <!-- 分享码登录表单 -->
                 <div id="share-code-form" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-4">
                     <div class="text-center mb-4">
                         <div class="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-3">
@@ -338,11 +257,9 @@
                     <button onclick="app.verifyShareCode()" class="w-full py-3 bg-amber-500 text-white rounded-lg font-medium hover:bg-amber-600 transition">
                         验证并进入
                     </button>
-                    <div class="text-center">
-                        <button onclick="app.showLoginForm()" class="text-sm text-gray-500 hover:text-indigo-600 transition">
-                            返回GitHub连接
-                        </button>
-                    </div>
+                    <button onclick="app.showLoginOptions()" class="w-full py-2 text-gray-500 hover:text-gray-700 transition text-sm">
+                        返回
+                    </button>
                 </div>
             </div>
         </div>
@@ -358,7 +275,6 @@
                     </div>
                     <h2 id="welcome-title" class="text-2xl font-bold mb-2 relative z-10">欢迎来到 Wiki</h2>
                     <p id="welcome-subtitle" class="opacity-90 mb-4 text-sm relative z-10">探索角色、世界观与错综复杂的关系网。</p>
-                    <!-- 后台模式显示编辑按钮 -->
                     <div class="edit-only hidden flex gap-2 relative z-10 flex-wrap">
                         <button onclick="app.createEntry('character')" class="bg-white text-indigo-600 px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-50 transition">
                             <i class="fa-solid fa-plus mr-1"></i> 角色
@@ -404,6 +320,9 @@
                         <span class="font-medium text-gray-700 text-xs">关系</span>
                     </div>
                 </div>
+
+                <!-- 首页自定义内容区域 -->
+                <div id="home-custom-content" class="space-y-3"></div>
             </div>
         </div>
     </template>
@@ -434,7 +353,7 @@
                     </button>
                     <div class="flex gap-2 items-center">
                         <span id="detail-code" class="text-xs font-mono text-gray-500 bg-gray-100 px-2 py-1 rounded"></span>
-                        <button onclick="app.editCurrentEntry()" class="edit-only bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-sm hover:bg-indigo-100 transition">
+                        <button onclick="app.editCurrentEntry()" class="edit-only hidden bg-indigo-50 text-indigo-600 px-3 py-1 rounded-lg text-sm hover:bg-indigo-100 transition">
                             <i class="fa-solid fa-pen-to-square"></i> 编辑
                         </button>
                     </div>
@@ -484,11 +403,126 @@
         </div>
     </template>
 
+    <!-- 剧情梗概查看模板 -->
+    <template id="tpl-synopsis-view">
+        <div class="h-full overflow-y-auto bg-gray-50 fade-in">
+            <div class="sticky top-0 bg-white/90 backdrop-blur z-10 px-4 py-3 flex justify-between items-center border-b border-gray-200">
+                <button onclick="app.router('home')" class="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm">
+                    <i class="fa-solid fa-arrow-left"></i> 返回
+                </button>
+                <h2 class="font-bold text-gray-800">剧情梗概</h2>
+                <button onclick="app.router('synopsis-edit')" class="edit-only hidden text-indigo-600 hover:text-indigo-700 text-sm">
+                    <i class="fa-solid fa-pen"></i> 编辑
+                </button>
+            </div>
+            <div id="synopsis-view-list" class="max-w-3xl mx-auto p-4 pb-20"></div>
+        </div>
+    </template>
+
+    <!-- 剧情梗概编辑模板 -->
+    <template id="tpl-synopsis-edit">
+        <div class="h-full flex flex-col bg-gray-50 fade-in">
+            <div class="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <button onclick="app.router('synopsis')" class="text-gray-500 hover:text-gray-800">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <span class="font-bold text-gray-800">编辑剧情梗概</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="app.addSynopsisChapter()" class="px-3 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">
+                        <i class="fa-solid fa-plus mr-1"></i>添加章节
+                    </button>
+                    <button onclick="app.saveSynopsis()" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow text-sm">
+                        <i class="fa-solid fa-save mr-1"></i>保存
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <div id="synopsis-chapters-list" class="max-w-3xl mx-auto space-y-4 pb-20"></div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 章节管理模板 -->
+    <template id="tpl-timeline-settings">
+        <div class="h-full flex flex-col bg-gray-50 fade-in">
+            <div class="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <button onclick="app.router('settings')" class="text-gray-500 hover:text-gray-800">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <span class="font-bold text-gray-800">章节管理</span>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="app.addChapter()" class="px-3 py-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg text-sm">
+                        <i class="fa-solid fa-plus mr-1"></i>添加章节
+                    </button>
+                    <button onclick="app.saveTimelineSettings()" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow text-sm">
+                        <i class="fa-solid fa-save mr-1"></i>保存
+                    </button>
+                </div>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <div id="timeline-chapters-list" class="max-w-3xl mx-auto space-y-2 pb-20"></div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 关系图模板 -->
+    <template id="tpl-graph">
+        <div class="h-full flex flex-col bg-gray-50 fade-in">
+            <div class="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0">
+                <button onclick="app.router('home')" class="text-gray-500 hover:text-gray-800 flex items-center gap-1 text-sm">
+                    <i class="fa-solid fa-arrow-left"></i> 返回
+                </button>
+                <h2 class="font-bold text-gray-800">角色关系图</h2>
+                <div class="w-8"></div>
+            </div>
+            <div class="flex-1 relative overflow-hidden">
+                <div id="graph-container" class="absolute inset-0"></div>
+            </div>
+        </div>
+    </template>
+
+    <!-- 公告编辑模板 -->
+    <template id="tpl-announcement-edit">
+        <div class="h-full flex flex-col bg-gray-50 fade-in">
+            <div class="bg-white border-b px-4 py-3 flex justify-between items-center shrink-0">
+                <div class="flex items-center gap-2">
+                    <button onclick="app.router('home')" class="text-gray-500 hover:text-gray-800">
+                        <i class="fa-solid fa-arrow-left"></i>
+                    </button>
+                    <span class="font-bold text-gray-800">编辑公告</span>
+                </div>
+                <button onclick="app.saveAnnouncement()" class="px-4 py-1.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 shadow text-sm">
+                    <i class="fa-solid fa-save mr-1"></i>发布
+                </button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4">
+                <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">标题</label>
+                        <input type="text" id="announcement-edit-title" class="w-full text-xl font-bold border-b-2 border-gray-200 focus:border-indigo-500 outline-none py-2 bg-transparent" placeholder="输入公告标题">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">作者</label>
+                        <input type="text" id="announcement-edit-author" class="w-full text-sm border border-gray-200 rounded-lg px-3 py-2" placeholder="输入作者名称">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-gray-500 uppercase mb-1">内容</label>
+                        <textarea id="announcement-edit-content" class="w-full p-3 border border-gray-200 rounded-lg text-sm resize-none" rows="10" placeholder="输入公告内容..."></textarea>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </template>
+
     <!-- 系统设置模板 -->
     <template id="tpl-settings">
         <div class="h-full overflow-y-auto p-4 fade-in pb-20">
             <div class="max-w-2xl mx-auto space-y-4">
-                <!-- 前台模式：字体设置和导出 -->
+                <!-- 字体设置 -->
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
                         <i class="fa-solid fa-font text-purple-600"></i> 字体设置
@@ -498,6 +532,33 @@
                             <option value="'Noto Sans SC', sans-serif">默认字体</option>
                             <option value="'Noto Serif SC', serif">宋体</option>
                         </select>
+                    </div>
+                </div>
+
+                <!-- 后台模式：章节管理 -->
+                <div class="edit-only hidden bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-list-ol text-blue-600"></i> 章节管理
+                    </h2>
+                    <button onclick="app.router('timeline-settings')" class="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 transition">
+                        <i class="fa-solid fa-gear mr-2"></i>管理章节
+                    </button>
+                </div>
+
+                <!-- 后台模式：公告管理 -->
+                <div class="edit-only hidden bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-bullhorn text-orange-600"></i> 公告管理
+                    </h2>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="app.createAnnouncement()" class="p-2 bg-orange-50 hover:bg-orange-100 rounded-lg text-sm font-medium text-orange-700 transition">
+                            <i class="fa-solid fa-plus text-lg mb-1 block"></i>
+                            发布公告
+                        </button>
+                        <button onclick="app.viewAnnouncementHistory()" class="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 transition">
+                            <i class="fa-solid fa-history text-lg mb-1 block"></i>
+                            历史公告
+                        </button>
                     </div>
                 </div>
 
@@ -518,6 +579,27 @@
                     </div>
                 </div>
 
+                <!-- 后台模式：数据导入 -->
+                <div class="edit-only hidden bg-white rounded-xl shadow-sm border border-gray-200 p-5">
+                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
+                        <i class="fa-solid fa-file-import text-green-600"></i> 数据导入
+                    </h2>
+                    <div class="space-y-3">
+                        <p class="text-xs text-gray-500">
+                            <i class="fa-solid fa-info-circle mr-1"></i>
+                            选择"Wiki数据"文件夹（包含 data.json/wiki-manifest.json 和 wiki-images 文件夹）
+                        </p>
+                        <input type="file" id="import-folder" webkitdirectory directory multiple 
+                            class="hidden" onchange="app.handleImportFolder(this)">
+                        <button onclick="document.getElementById('import-folder').click()" 
+                            class="w-full py-2 bg-green-50 text-green-600 rounded-lg text-sm hover:bg-green-100 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-folder-open"></i>
+                            选择Wiki数据文件夹
+                        </button>
+                        <div id="import-status" class="hidden text-xs text-center py-2 rounded-lg"></div>
+                    </div>
+                </div>
+
                 <!-- 后台模式：GitHub设置 -->
                 <div class="edit-only hidden bg-white rounded-xl shadow-sm border border-gray-200 p-5">
                     <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
@@ -530,27 +612,6 @@
                         <button onclick="app.disconnectGitHub()" class="w-full py-2 bg-red-50 text-red-600 rounded-lg text-sm hover:bg-red-100 transition">
                             断开连接
                         </button>
-                    </div>
-                </div>
-
-                <!-- 后台模式：数据导入 -->
-                <div class="edit-only hidden bg-white rounded-xl shadow-sm border border-gray-200 p-5">
-                    <h2 class="text-lg font-bold mb-4 flex items-center gap-2">
-                        <i class="fa-solid fa-file-import text-green-600"></i> 数据导入
-                    </h2>
-                    <div class="space-y-3">
-                        <p class="text-xs text-gray-500">
-                            <i class="fa-solid fa-info-circle mr-1"></i>
-                            选择"Wiki数据"文件夹（包含 data.json 和 wiki-images 文件夹）
-                        </p>
-                        <input type="file" id="import-folder" webkitdirectory directory multiple 
-                            class="hidden" onchange="app.handleImportFolder(this)">
-                        <button onclick="document.getElementById('import-folder').click()" 
-                            class="w-full py-2 bg-green-50 text-green-600 rounded-lg text-sm hover:bg-green-100 transition flex items-center justify-center gap-2">
-                            <i class="fa-solid fa-folder-open"></i>
-                            选择Wiki数据文件夹
-                        </button>
-                        <div id="import-status" class="hidden text-xs text-center py-2 rounded-lg"></div>
                     </div>
                 </div>
 
@@ -575,8 +636,8 @@
     </template>
 
     <!-- ========== JavaScript ========== -->
-    <script src="wiki-github-core.js"></script>
     <script src="wiki-github-storage.js"></script>
+    <script src="wiki-github-core.js"></script>
     <script>
         document.addEventListener('DOMContentLoaded', () => {
             if (typeof app !== 'undefined' && app.init) {

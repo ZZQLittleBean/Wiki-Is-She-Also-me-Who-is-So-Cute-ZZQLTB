@@ -185,12 +185,30 @@ app.githubStorage = {
     
     // ========== Wiki数据操作 ==========
     
-    // 加载Wiki数据
-    async loadWikiData() {
+    // 加载Wiki数据（支持 data.json 或 wiki-manifest.json）
+    async loadWikiData(filename = null) {
         try {
-            const file = await this.getFile('data.json');
-            if (file) {
-                return JSON.parse(file.content);
+            // 如果指定了文件名，直接加载
+            if (filename) {
+                const file = await this.getFile(filename);
+                if (file) {
+                    return JSON.parse(file.content);
+                }
+                return null;
+            }
+            
+            // 否则尝试多个文件名
+            const filenames = ['wiki-manifest.json', 'data.json'];
+            for (const name of filenames) {
+                try {
+                    const file = await this.getFile(name);
+                    if (file) {
+                        console.log('[GitHub] 加载数据文件:', name);
+                        return JSON.parse(file.content);
+                    }
+                } catch (e) {
+                    // 继续尝试下一个
+                }
             }
             return null;
         } catch (error) {

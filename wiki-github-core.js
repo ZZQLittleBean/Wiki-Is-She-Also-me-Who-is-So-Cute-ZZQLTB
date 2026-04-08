@@ -1,6 +1,6 @@
 /**
- * GitHub版 Wiki 核心系统
- * 功能：前后台模式分离，GitHub存储，存档分享码
+ * GitHub版 Wiki 核心系统 v2.0
+ * 功能：前后台模式分离，GitHub存储，完整功能支持
  */
 
 const app = {
@@ -10,6 +10,7 @@ const app = {
         chapters: [],
         camps: [],
         synopsis: [],
+        announcements: [],
         currentTimeline: 'latest',
         currentMode: 'view',
         editingId: null,
@@ -17,11 +18,19 @@ const app = {
         viewingVersionId: null,
         wikiTitle: '未命名 Wiki',
         wikiSubtitle: '',
-        fontFamily: "'Noto Sans SC', sans-serif"
+        fontFamily: "'Noto Sans SC', sans-serif",
+        // 自定义字段支持
+        customFields: {},
+        // 首页自定义内容
+        homeContent: []
     },
     
     // 运行模式：'backend'(后台/编辑) 或 'frontend'(前台/只读)
     runMode: 'frontend',
+    
+    // 后台模式登录状态
+    backendLoggedIn: false,
+    backendPassword: null,
     
     // 分享码验证状态
     shareCodeVerified: false,
@@ -43,23 +52,242 @@ const app = {
 
     // ========== 初始化 ==========
     init() {
+        // 检查是否有保存的后台登录状态
+        const savedLogin = localStorage.getItem('wiki_backend_login');
+        if (savedLogin) {
+            try {
+                const loginData = JSON.parse(savedLogin);
+                if (loginData.expires > Date.now()) {
+                    this.backendLoggedIn = true;
+                    this.runMode = 'backend';
+                }
+            } catch (e) {
+                localStorage.removeItem('wiki_backend_login');
+            }
+        }
+        
         // 检查是否有保存的分享码
         const savedCode = localStorage.getItem('wiki_verified_sharecode');
-        if (savedCode) {
+        if (savedCode && !this.backendLoggedIn) {
             this.verifiedShareCode = savedCode;
             this.shareCodeVerified = true;
-            this.loadDataFromLocal();
-            this.router('home');
-            return;
         }
         
         // 检查GitHub配置
         if (this.githubStorage && this.githubStorage.init()) {
-            this.runMode = 'backend';
             this.loadDataFromGitHub();
         } else {
-            // 显示登录界面
             this.showLoginPage();
+        }
+    },
+
+    // ========== 登录页面 ==========
+    showLoginPage() {
+        const container = document.getElementById('main-container');
+        if (!container) return;
+        
+        const tpl = document.getElementById('tpl-login');
+        if (!tpl) return;
+        
+        const clone = tpl.content.cloneNode(true);
+        container.innerHTML = '';
+        container.appendChild(clone);
+        
+        // 显示前台模式入口
+        document.getElementById('frontend-login-btn').onclick = () => this.enterFrontendMode();
+        document.getElementById('backend-login-btn').onclick = () => this.showBackendLogin();
+    },
+
+    // 进入前台模式（分享码登录）
+    enterFrontendMode() {
+        document.getElementById('login-options').classList.add('hidden');
+        document.getElementById('share-code-form').classList.remove('hidden');
+    },
+
+    // 显示后台登录
+    showBackendLogin() {
+        document.getElementById('login-options').classList.add('hidden');
+        document.getElementById('backend-login-form').classList.remove('hidden');
+    },
+
+    // 返回登录选项
+    showLoginOptions() {
+        document.getElementById('share-code-form').classList.add('hidden');
+        document.getElementById('backend-login-form').classList.add('hidden');
+        document.getElementById('login-options').classList.remove('hidden');
+    },
+
+    // 后台模式登录
+    async loginBackend() {
+        const owner = document.getElementById('github-owner').value.trim();
+        const repo = document.getElementById('github-repo').value.trim();
+        const token = document.getElementById('github-token').value.trim();
+        const password = document.getElementById('backend-password').value.trim();
+        const branch = document.getElementById('github-branch').value.trim() || 'main';
+        
+        if (!owner || !repo || !token) {
+            this.showAlertDialog({
+                title: '信息不完整',
+                message: '请填写GitHub用户名、仓库名称和Token',
+                type: 'warning'
+            });
+            return;
+        }
+        
+        // 保存GitHub配置
+        this.githubStorage.saveConfig(owner, repo, token, branch);
+        
+        // 测试连接
+        const result = await this.githubStorage.testConnection();
+        if (!result.success) {
+            this.showAlertDialog({
+                title: '连接失败',
+                message: result.error || '无法连接到GitHub仓库',
+                type: 'error'
+            });
+            this.githubStorage.clearConfig();
+            return;
+        }
+        
+        // 设置后台密码（如果提供了）
+        if (password) {
+            this.backendPassword = password;
+            // 保存登录状态（7天）
+            localStorage.setItem('wiki_backend_login', JSON.stringify({
+                password: password,
+                expires: Date.now() + 7 * 24 * 60 * 60 * 1000
+            }));
+        }
+        
+        this.backendLoggedIn = true;
+        this.runMode = 'backend';
+        this.showToast('后台模式登录成功', 'success');
+        this.loadDataFromGitHub();
+    },
+
+    // 验证分享码（前台模式）
+    async verifyShareCode() {
+        const input = document.getElementById('share-code-input');
+        const code = input.value.trim().toUpperCase();
+        
+        if (!this.shareCodeSystem.validateCode(code)) {
+            this.showAlertDialog({
+                title: '格式错误',
+                message: '分享码应为8位字母数字组合',
+                type: 'warning'
+            });
+            return;
+        }
+        
+        // 从GitHub获取分享码列表验证
+        const isValid = await this.shareCodeSystem.verifyCode(code);
+        
+        if (isValid) {
+            this.shareCodeVerified = true;
+            this.verifiedShareCode = code;
+            localStorage.setItem('wiki_verified_sharecode', code);
+            this.showToast('验证成功', 'success');
+            this.loadDataFromGitHub();
+        } else {
+            this.showAlertDialog({
+                title: '验证失败',
+                message: '分享码无效或已过期',
+                type: 'error'
+            });
+        }
+    },
+
+    // 退出后台模式
+    logoutBackend() {
+        this.backendLoggedIn = false;
+        this.runMode = 'frontend';
+        this.backendPassword = null;
+        localStorage.removeItem('wiki_backend_login');
+        this.showToast('已退出后台模式', 'info');
+        this.router('home');
+        this.updateUIForMode();
+    },
+
+    // ========== 数据加载 ==========
+    async loadDataFromGitHub() {
+        try {
+            // 尝试加载 wiki-manifest.json（本地版格式）
+            let data = await this.githubStorage.loadWikiData('wiki-manifest.json');
+            
+            // 如果没有，尝试 data.json
+            if (!data) {
+                data = await this.githubStorage.loadWikiData('data.json');
+            }
+            
+            if (data) {
+                this.data = { ...this.data, ...data };
+                // 确保所有必要字段存在
+                if (!this.data.entries) this.data.entries = [];
+                if (!this.data.chapters) this.data.chapters = [];
+                if (!this.data.camps) this.data.camps = ['主角团', '反派', '中立'];
+                if (!this.data.synopsis) this.data.synopsis = [];
+                if (!this.data.announcements) this.data.announcements = [];
+                if (!this.data.customFields) this.data.customFields = {};
+                if (!this.data.homeContent) this.data.homeContent = [];
+            } else {
+                // 首次使用，创建空数据
+                this.data.entries = [];
+                this.data.chapters = [];
+                this.data.camps = ['主角团', '反派', '中立'];
+                this.data.synopsis = [];
+                this.data.announcements = [];
+                this.data.customFields = {};
+                this.data.homeContent = [];
+            }
+            
+            this.applyFont();
+            this.updateUIForMode();
+            this.router('home');
+        } catch (error) {
+            console.error('加载数据失败:', error);
+            this.showAlertDialog({
+                title: '加载失败',
+                message: '无法从GitHub加载数据: ' + error.message,
+                type: 'error'
+            });
+        }
+    },
+
+    // ========== 根据模式更新UI ==========
+    updateUIForMode() {
+        // 更新模式徽章（仅后台模式显示）
+        const badge = document.getElementById('mode-badge');
+        if (badge) {
+            if (this.runMode === 'backend') {
+                badge.classList.remove('hidden');
+                badge.className = 'mode-badge backend';
+                badge.textContent = '后台模式';
+            } else {
+                badge.classList.add('hidden');
+            }
+        }
+        
+        // 显示/隐藏编辑相关元素
+        document.querySelectorAll('.edit-only').forEach(el => {
+            el.classList.toggle('hidden', this.runMode !== 'backend');
+        });
+        
+        // 显示/隐藏模式切换
+        const modeSwitch = document.getElementById('mode-switch-container');
+        if (modeSwitch) {
+            modeSwitch.classList.toggle('hidden', this.runMode !== 'backend');
+        }
+        
+        // 显示/隐藏退出后台按钮
+        const logoutBtn = document.getElementById('logout-backend-btn');
+        if (logoutBtn) {
+            logoutBtn.classList.toggle('hidden', this.runMode !== 'backend');
+        }
+        
+        // 更新标题
+        const titleEl = document.getElementById('wiki-title-display');
+        if (titleEl) {
+            titleEl.textContent = this.data.wikiTitle || '未命名 Wiki';
         }
     },
 
@@ -102,25 +330,35 @@ const app = {
                     this.router('home');
                 }
                 break;
-            case 'announcement-edit':
-                this.showToast('公告编辑功能在GitHub版暂未开放', 'info');
-                this.router('home');
+            case 'synopsis':
+                this.renderSynopsis(container);
                 break;
             case 'synopsis-edit':
-                this.showToast('剧情梗概编辑功能在GitHub版暂未开放', 'info');
-                this.router('home');
-                break;
-            case 'synopsis':
-                this.showToast('剧情梗概功能在GitHub版暂未开放', 'info');
-                this.router('home');
+                if (this.runMode === 'backend') {
+                    this.renderSynopsisEdit(container);
+                } else {
+                    this.showToast('前台模式不支持编辑', 'warning');
+                    this.router('synopsis');
+                }
                 break;
             case 'graph':
-                this.showToast('关系图功能在GitHub版暂未开放', 'info');
-                this.router('home');
+                this.renderGraph(container);
                 break;
             case 'timeline-settings':
-                this.showToast('章节管理功能在GitHub版暂未开放', 'info');
-                this.router('settings');
+                if (this.runMode === 'backend') {
+                    this.renderTimelineSettings(container);
+                } else {
+                    this.showToast('前台模式不支持编辑', 'warning');
+                    this.router('settings');
+                }
+                break;
+            case 'announcement-edit':
+                if (this.runMode === 'backend') {
+                    this.renderAnnouncementEdit(container);
+                } else {
+                    this.showToast('前台模式不支持编辑', 'warning');
+                    this.router('home');
+                }
                 break;
             default:
                 this.renderHome(container);
@@ -131,195 +369,7 @@ const app = {
         }
     },
 
-    // ========== 登录页面 ==========
-    showLoginPage() {
-        const container = document.getElementById('main-container');
-        if (!container) return;
-        
-        const tpl = document.getElementById('tpl-login');
-        if (!tpl) return;
-        
-        const clone = tpl.content.cloneNode(true);
-        container.appendChild(clone);
-    },
-
-    // 切换到分享码登录
-    enterFrontendMode() {
-        document.getElementById('login-form').classList.add('hidden');
-        document.getElementById('share-code-form').classList.remove('hidden');
-    },
-
-    // 返回GitHub登录
-    showLoginForm() {
-        document.getElementById('share-code-form').classList.add('hidden');
-        document.getElementById('login-form').classList.remove('hidden');
-    },
-
-    // 连接GitHub
-    async connectToGitHub() {
-        const owner = document.getElementById('github-owner').value.trim();
-        const repo = document.getElementById('github-repo').value.trim();
-        const token = document.getElementById('github-token').value.trim();
-        const branch = document.getElementById('github-branch').value.trim() || 'main';
-        
-        if (!owner || !repo || !token) {
-            this.showAlertDialog({
-                title: '信息不完整',
-                message: '请填写所有必填项',
-                type: 'warning'
-            });
-            return;
-        }
-        
-        this.githubStorage.saveConfig(owner, repo, token, branch);
-        
-        const result = await this.githubStorage.testConnection();
-        if (result.success) {
-            this.runMode = 'backend';
-            this.showToast('连接成功', 'success');
-            this.loadDataFromGitHub();
-        } else {
-            this.showAlertDialog({
-                title: '连接失败',
-                message: result.error || '无法连接到GitHub仓库',
-                type: 'error'
-            });
-            this.githubStorage.clearConfig();
-        }
-    },
-
-    // 断开GitHub连接
-    disconnectGitHub() {
-        this.githubStorage.clearConfig();
-        location.reload();
-    },
-
-    // 验证分享码
-    async verifyShareCode() {
-        const input = document.getElementById('share-code-input');
-        const code = input.value.trim().toUpperCase();
-        
-        if (!this.shareCodeSystem.validateCode(code)) {
-            this.showAlertDialog({
-                title: '格式错误',
-                message: '分享码应为8位字母数字组合',
-                type: 'warning'
-            });
-            return;
-        }
-        
-        // 先配置GitHub（从前台模式配置中读取）
-        const frontendConfig = localStorage.getItem('wiki_frontend_config');
-        if (frontendConfig) {
-            try {
-                const config = JSON.parse(frontendConfig);
-                this.githubStorage.saveConfig(
-                    config.owner, config.repo, config.token, config.branch, config.dataPath
-                );
-            } catch (e) {
-                this.showAlertDialog({
-                    title: '配置错误',
-                    message: '前台模式配置无效，请联系管理员',
-                    type: 'error'
-                });
-                return;
-            }
-        } else {
-            this.showAlertDialog({
-                title: '配置缺失',
-                message: '前台模式需要预配置，请联系管理员',
-                type: 'error'
-            });
-            return;
-        }
-        
-        const isValid = await this.shareCodeSystem.verifyCode(code);
-        
-        if (isValid) {
-            this.shareCodeVerified = true;
-            this.verifiedShareCode = code;
-            localStorage.setItem('wiki_verified_sharecode', code);
-            this.showToast('验证成功', 'success');
-            this.loadDataFromGitHub();
-        } else {
-            this.showAlertDialog({
-                title: '验证失败',
-                message: '分享码无效或已过期',
-                type: 'error'
-            });
-        }
-    },
-
-    // ========== 数据加载 ==========
-    async loadDataFromGitHub() {
-        try {
-            const data = await this.githubStorage.loadWikiData();
-            if (data) {
-                this.data = { ...this.data, ...data };
-                this.applyFont();
-                this.updateUIForMode();
-                this.router('home');
-            } else {
-                // 首次使用，创建空数据
-                this.data.entries = [];
-                this.data.chapters = [];
-                this.data.camps = ['主角团', '反派', '中立'];
-                this.data.synopsis = [];
-                this.updateUIForMode();
-                this.router('home');
-            }
-        } catch (error) {
-            console.error('加载数据失败:', error);
-            this.showAlertDialog({
-                title: '加载失败',
-                message: '无法从GitHub加载数据',
-                type: 'error'
-            });
-        }
-    },
-
-    loadDataFromLocal() {
-        const saved = localStorage.getItem('wiki_data_backup');
-        if (saved) {
-            try {
-                this.data = JSON.parse(saved);
-            } catch (e) {
-                console.error('本地数据解析失败');
-            }
-        }
-        this.updateUIForMode();
-    },
-
-    // ========== 根据模式更新UI ==========
-    updateUIForMode() {
-        // 更新模式徽章（仅后台模式显示）
-        const badge = document.getElementById('mode-badge');
-        if (badge) {
-            if (this.runMode === 'backend') {
-                badge.classList.remove('hidden');
-                badge.className = 'mode-badge backend';
-                badge.textContent = '后台模式';
-            } else {
-                badge.classList.add('hidden');
-            }
-        }
-        
-        // 显示/隐藏编辑相关元素
-        document.querySelectorAll('.edit-only').forEach(el => {
-            el.classList.toggle('hidden', this.runMode !== 'backend');
-        });
-        
-        // 显示/隐藏模式切换
-        const modeSwitch = document.getElementById('mode-switch-container');
-        if (modeSwitch) {
-            modeSwitch.classList.toggle('hidden', this.runMode !== 'backend');
-        }
-        
-        // 更新标题
-        document.getElementById('wiki-title-display').textContent = this.data.wikiTitle || '未命名 Wiki';
-    },
-
-    // ========== 页面渲染 ==========
+    // ========== 页面渲染函数 ==========
     renderHome(container) {
         const tpl = document.getElementById('tpl-home');
         if (!tpl) return;
@@ -327,8 +377,10 @@ const app = {
         const clone = tpl.content.cloneNode(true);
         
         // 更新欢迎信息
-        clone.getElementById('welcome-title').textContent = this.data.wikiTitle || '欢迎来到 Wiki';
-        clone.getElementById('welcome-subtitle').textContent = this.data.wikiSubtitle || '探索角色、世界观与错综复杂的关系网。';
+        const titleEl = clone.getElementById('welcome-title');
+        const subtitleEl = clone.getElementById('welcome-subtitle');
+        if (titleEl) titleEl.textContent = this.data.wikiTitle || '欢迎来到 Wiki';
+        if (subtitleEl) subtitleEl.textContent = this.data.wikiSubtitle || '探索角色、世界观与错综复杂的关系网。';
         
         // 显示/隐藏编辑按钮
         clone.querySelectorAll('.edit-only').forEach(el => {
@@ -336,6 +388,55 @@ const app = {
         });
         
         container.appendChild(clone);
+        
+        // 渲染首页自定义内容
+        this.renderHomeCustomContent();
+    },
+
+    renderHomeCustomContent() {
+        const container = document.getElementById('home-custom-content');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        if (!this.data.homeContent || this.data.homeContent.length === 0) {
+            container.innerHTML = '<p class="text-gray-400 text-center py-4">暂无自定义内容</p>';
+            return;
+        }
+        
+        this.data.homeContent.forEach((item, idx) => {
+            if (item.type === 'text') {
+                const div = document.createElement('div');
+                div.className = 'bg-white p-4 rounded-xl shadow-sm border border-gray-100';
+                if (this.runMode === 'backend') {
+                    div.innerHTML = `
+                        <textarea class="w-full p-2 border border-gray-200 rounded-lg text-sm resize-none" rows="3"
+                            placeholder="输入文本内容..."
+                            onchange="app.updateHomeText(${idx}, this.value)" data-idx="${idx}">${item.content || ''}</textarea>
+                        <button onclick="app.removeHomeItem(${idx})" class="mt-2 text-red-500 text-xs hover:text-red-700">
+                            <i class="fa-solid fa-trash"></i> 删除
+                        </button>
+                    `;
+                } else {
+                    div.innerHTML = `<p class="text-gray-700">${item.content || ''}</p>`;
+                }
+                container.appendChild(div);
+            } else if (item.type === 'entry-ref') {
+                const entry = this.data.entries.find(e => e.id === item.entryId);
+                if (!entry) return;
+                
+                const div = document.createElement('div');
+                div.className = 'bg-indigo-50 p-4 rounded-xl border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition';
+                div.onclick = () => this.openEntry(entry.id);
+                div.innerHTML = `
+                    <div class="flex items-center gap-3">
+                        <i class="fa-solid fa-book text-indigo-500"></i>
+                        <span class="font-medium text-indigo-700">${item.title || entry.code}</span>
+                    </div>
+                `;
+                container.appendChild(div);
+            }
+        });
     },
 
     renderList(container, type) {
@@ -360,6 +461,13 @@ const app = {
         if (items.length === 0) {
             masonry.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">暂无数据</div>';
         } else {
+            // 按重要程度排序
+            items.sort((a, b) => {
+                const vA = this.getVisibleVersion(a);
+                const vB = this.getVisibleVersion(b);
+                return (vA?.level || 5) - (vB?.level || 5);
+            });
+            
             items.forEach(entry => {
                 const version = this.getVisibleVersion(entry) || entry.versions?.[0];
                 if (version) {
@@ -367,31 +475,6 @@ const app = {
                     if (card) masonry.appendChild(card);
                 }
             });
-        }
-        
-        container.appendChild(clone);
-    },
-
-    renderSettings(container) {
-        const tpl = document.getElementById('tpl-settings');
-        if (!tpl) return;
-        
-        const clone = tpl.content.cloneNode(true);
-        
-        // 显示/隐藏编辑相关设置
-        clone.querySelectorAll('.edit-only').forEach(el => {
-            el.classList.toggle('hidden', this.runMode !== 'backend');
-        });
-        
-        // 更新GitHub仓库显示
-        if (this.runMode === 'backend' && this.githubStorage.isConfigured()) {
-            const repoDisplay = clone.getElementById('github-repo-display');
-            if (repoDisplay) {
-                repoDisplay.textContent = `${this.githubStorage.config.owner}/${this.githubStorage.config.repo}`;
-            }
-            
-            // 加载分享码列表
-            this.loadShareCodeList(clone.getElementById('share-code-list'));
         }
         
         container.appendChild(clone);
@@ -456,7 +539,6 @@ const app = {
                 } else if (block.type === 'h3') {
                     contentHtml += `<h3 class="text-lg font-bold text-gray-700 mt-6 mb-3">${block.text}</h3>`;
                 } else {
-                    // 处理链接
                     let text = block.text || '';
                     text = text.replace(/\[\[(.*?)\]\]/g, '<a href="#" onclick="app.searchAndOpen(\'$1\'); return false;" class="text-indigo-600 hover:underline">$1</a>');
                     contentHtml += `<p class="text-gray-600 leading-relaxed mb-4 break-all">${text}</p>`;
@@ -465,36 +547,538 @@ const app = {
         }
         contentHtml += '</div>';
         
+        // 版本切换
+        if (entry.versions.length > 1) {
+            contentHtml += `
+                <div class="mt-8 pt-6 border-t border-gray-200">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-3">版本切换</h3>
+                    <div class="flex flex-wrap gap-2">
+            `;
+            entry.versions.forEach((v, idx) => {
+                const isCurrent = v.vid === version.vid;
+                contentHtml += `
+                    <button onclick="app.switchToVersion('${entry.id}', '${v.vid}')" 
+                        class="px-3 py-1.5 rounded-lg text-sm ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                        版本 ${idx + 1}: ${v.title}
+                    </button>
+                `;
+            });
+            contentHtml += '</div></div>';
+        }
+        
         contentEl.innerHTML = contentHtml;
         container.appendChild(clone);
     },
 
-    // ========== 词条卡片 ==========
+    renderEdit(container) {
+        const isNew = !this.data.editingId;
+        
+        // 初始化临时数据
+        if (isNew) {
+            const type = this.data.editingType || 'character';
+            const code = this.generateCode(type);
+            
+            this.tempEntry = {
+                id: (type === 'character' ? 'char-' : 'non-') + Date.now(),
+                type: type,
+                code: code,
+                versions: [],
+                pinned: false,
+                pinStartChapter: null,
+                pinEndChapter: null,
+                pinnedVersions: {},
+                missingIntervalVersion: null,
+                defaultPinnedVersion: null
+            };
+            
+            this.tempVersion = {
+                vid: 'v-' + Date.now(),
+                title: '',
+                subtitle: '',
+                level: 5,
+                images: { avatar: null, card: null, cover: null },
+                chapterFrom: null,
+                chapterTo: null,
+                blocks: [],
+                relatedCharacters: [],
+                relatedVersions: [],
+                createdAt: Date.now()
+            };
+            
+            this.tempEntry.versions.push(this.tempVersion);
+            this.editingVersionId = this.tempVersion.vid;
+            this.editState.hasChanges = true;
+        } else {
+            const entry = this.data.entries.find(e => e.id === this.data.editingId);
+            this.tempEntry = JSON.parse(JSON.stringify(entry));
+            this.tempVersion = JSON.parse(JSON.stringify(entry.versions[entry.versions.length - 1]));
+            this.editingVersionId = this.tempVersion.vid;
+            this.editState.originalEntry = JSON.parse(JSON.stringify(entry));
+            this.editState.originalVersion = JSON.parse(JSON.stringify(this.tempVersion));
+            this.editState.hasChanges = false;
+        }
+        
+        this.editState.undoStack = [];
+        this.editState.redoStack = [];
+        
+        const tpl = document.getElementById('tpl-detail-edit');
+        if (!tpl) return;
+        
+        const clone = tpl.content.cloneNode(true);
+        
+        const titleInput = clone.getElementById('edit-title');
+        const codeInput = clone.getElementById('edit-code');
+        const subtitleInput = clone.getElementById('edit-subtitle');
+        
+        if (titleInput) titleInput.value = this.tempVersion.title;
+        if (codeInput) codeInput.value = this.tempEntry.code;
+        if (subtitleInput) subtitleInput.value = this.tempVersion.subtitle || '';
+        
+        // 绑定键盘快捷键
+        this.bindEditKeyboardShortcuts();
+        
+        container.appendChild(clone);
+    },
+
+    renderSettings(container) {
+        const tpl = document.getElementById('tpl-settings');
+        if (!tpl) return;
+        
+        const clone = tpl.content.cloneNode(true);
+        
+        // 显示/隐藏编辑相关设置
+        clone.querySelectorAll('.edit-only').forEach(el => {
+            el.classList.toggle('hidden', this.runMode !== 'backend');
+        });
+        
+        // 更新GitHub仓库显示
+        if (this.runMode === 'backend' && this.githubStorage.isConfigured()) {
+            const repoDisplay = clone.getElementById('github-repo-display');
+            if (repoDisplay) {
+                repoDisplay.textContent = `${this.githubStorage.config.owner}/${this.githubStorage.config.repo}`;
+            }
+            
+            // 加载分享码列表
+            this.loadShareCodeList(clone.getElementById('share-code-list'));
+        }
+        
+        container.appendChild(clone);
+    },
+
+    // ========== 剧情梗概 ==========
+    renderSynopsis(container) {
+        const tpl = document.getElementById('tpl-synopsis-view');
+        if (!tpl) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-400">剧情梗概模板未找到</div>';
+            return;
+        }
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+        
+        // 同步剧情梗概与章节
+        this.syncSynopsisWithChapters();
+        
+        const list = document.getElementById('synopsis-view-list');
+        if (list) {
+            this.data.synopsis.forEach(chapter => {
+                const item = document.createElement('div');
+                item.className = 'synopsis-chapter-item p-6 border-b border-gray-200';
+                item.innerHTML = `
+                    <h3 class="text-xl font-bold text-gray-800 mb-2">
+                        <span class="text-indigo-600 mr-2">${this.formatChapterNum(chapter.num)}</span>
+                        ${chapter.title}
+                    </h3>
+                    <div class="prose prose-sm max-w-none text-gray-600">
+                        ${chapter.content ? chapter.content.replace(/\n/g, '<br>') : '<p class="text-gray-400 italic">暂无内容</p>'}
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+    },
+
+    renderSynopsisEdit(container) {
+        const tpl = document.getElementById('tpl-synopsis-edit');
+        if (!tpl) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-400">剧情梗概编辑模板未找到</div>';
+            return;
+        }
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+        
+        this.syncSynopsisWithChapters();
+        
+        const list = document.getElementById('synopsis-chapters-list');
+        if (list) {
+            this.data.synopsis.forEach(chapter => {
+                const item = document.createElement('div');
+                item.className = 'bg-white rounded-lg border border-gray-200 mb-4 overflow-hidden';
+                item.innerHTML = `
+                    <div class="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200">
+                        <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold">${this.formatChapterNum(chapter.num)}</span>
+                        <input type="text" class="flex-1 bg-transparent border-none outline-none text-sm font-medium" 
+                            value="${chapter.title}" onchange="app.updateSynopsisTitle('${chapter.id}', this.value)">
+                        <button onclick="app.removeSynopsisChapter('${chapter.id}')" class="text-red-500 hover:text-red-700 p-1.5">
+                            <i class="fa-solid fa-trash text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="p-3">
+                        <textarea class="w-full p-2 border border-gray-200 rounded-lg text-sm resize-none" rows="4"
+                            onchange="app.updateSynopsisContent('${chapter.id}', this.value)">${chapter.content || ''}</textarea>
+                    </div>
+                `;
+                list.appendChild(item);
+            });
+        }
+    },
+
+    syncSynopsisWithChapters() {
+        const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+        const existingSynopsis = {};
+        this.data.synopsis.forEach(s => { existingSynopsis[s.chapterId] = s; });
+
+        const newSynopsis = [];
+        sortedChapters.forEach(ch => {
+            if (existingSynopsis[ch.id]) {
+                newSynopsis.push(existingSynopsis[ch.id]);
+            } else {
+                newSynopsis.push({
+                    id: 'syn-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
+                    chapterId: ch.id,
+                    num: ch.num,
+                    title: ch.title || `第${ch.num}章`,
+                    content: '',
+                    image: null
+                });
+            }
+        });
+        this.data.synopsis = newSynopsis;
+    },
+
+    updateSynopsisTitle(chapterId, title) {
+        const chapter = this.data.synopsis.find(s => s.id === chapterId);
+        if (chapter) chapter.title = title;
+    },
+
+    updateSynopsisContent(chapterId, content) {
+        const chapter = this.data.synopsis.find(s => s.id === chapterId);
+        if (chapter) chapter.content = content;
+    },
+
+    removeSynopsisChapter(chapterId) {
+        this.showConfirmDialog({
+            title: '删除确认',
+            message: '确定删除此章节的剧情梗概？',
+            confirmText: '删除',
+            cancelText: '取消',
+            type: 'warning'
+        }).then(confirmed => {
+            if (confirmed) {
+                this.data.synopsis = this.data.synopsis.filter(s => s.id !== chapterId);
+                this.renderSynopsisEdit(document.getElementById('main-container'));
+            }
+        });
+    },
+
+    addSynopsisChapter() {
+        const num = this.data.chapters.length + 1;
+        const chapterId = 'ch-' + Date.now();
+        
+        // 添加章节
+        this.data.chapters.push({
+            id: chapterId,
+            num: num,
+            title: `第${num}章`,
+            order: num
+        });
+        
+        // 同步添加剧情梗概
+        this.data.synopsis.push({
+            id: 'syn-' + Date.now(),
+            chapterId: chapterId,
+            num: num,
+            title: `第${num}章`,
+            content: '',
+            image: null
+        });
+        
+        this.renderSynopsisEdit(document.getElementById('main-container'));
+    },
+
+    saveSynopsis() {
+        this.saveData();
+        this.showToast('剧情梗概已保存', 'success');
+    },
+
+    // ========== 时间轴/章节管理 ==========
+    renderTimelineSettings(container) {
+        const tpl = document.getElementById('tpl-timeline-settings');
+        if (!tpl) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-400">章节管理模板未找到</div>';
+            return;
+        }
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+        
+        const list = document.getElementById('timeline-chapters-list');
+        if (list) {
+            const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+            sortedChapters.forEach((ch, idx) => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-3 p-3 bg-white rounded-lg border border-gray-200';
+                item.innerHTML = `
+                    <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold font-mono w-16 text-center">${this.formatChapterNum(ch.num)}</span>
+                    <input type="text" class="flex-1 bg-transparent border border-gray-200 rounded px-2 py-1 text-sm" 
+                        value="${ch.title}" onchange="app.updateChapterTitle('${ch.id}', this.value)">
+                    <button onclick="app.moveChapter('${ch.id}', -1)" class="text-gray-400 hover:text-gray-600 p-1" ${idx === 0 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-arrow-up"></i>
+                    </button>
+                    <button onclick="app.moveChapter('${ch.id}', 1)" class="text-gray-400 hover:text-gray-600 p-1" ${idx === sortedChapters.length - 1 ? 'disabled' : ''}>
+                        <i class="fa-solid fa-arrow-down"></i>
+                    </button>
+                    <button onclick="app.deleteChapter('${ch.id}')" class="text-red-400 hover:text-red-600 p-1">
+                        <i class="fa-solid fa-trash"></i>
+                    </button>
+                `;
+                list.appendChild(item);
+            });
+        }
+    },
+
+    updateChapterTitle(chapterId, title) {
+        const chapter = this.data.chapters.find(c => c.id === chapterId);
+        if (chapter) {
+            chapter.title = title;
+            // 同步更新剧情梗概标题
+            const synopsis = this.data.synopsis.find(s => s.chapterId === chapterId);
+            if (synopsis) synopsis.title = title;
+        }
+    },
+
+    moveChapter(chapterId, direction) {
+        const idx = this.data.chapters.findIndex(c => c.id === chapterId);
+        if (idx === -1) return;
+        
+        const newIdx = idx + direction;
+        if (newIdx < 0 || newIdx >= this.data.chapters.length) return;
+        
+        // 交换位置
+        const temp = this.data.chapters[idx];
+        this.data.chapters[idx] = this.data.chapters[newIdx];
+        this.data.chapters[newIdx] = temp;
+        
+        // 更新order
+        this.data.chapters.forEach((c, i) => c.order = i + 1);
+        
+        this.renderTimelineSettings(document.getElementById('main-container'));
+    },
+
+    deleteChapter(chapterId) {
+        this.showConfirmDialog({
+            title: '删除确认',
+            message: '确定删除此章节？相关的剧情梗概也会被删除。',
+            confirmText: '删除',
+            cancelText: '取消',
+            type: 'danger'
+        }).then(confirmed => {
+            if (confirmed) {
+                this.data.chapters = this.data.chapters.filter(c => c.id !== chapterId);
+                this.data.synopsis = this.data.synopsis.filter(s => s.chapterId !== chapterId);
+                this.renderTimelineSettings(document.getElementById('main-container'));
+            }
+        });
+    },
+
+    addChapter() {
+        const num = this.data.chapters.length + 1;
+        const chapterId = 'ch-' + Date.now();
+        
+        this.data.chapters.push({
+            id: chapterId,
+            num: num,
+            title: `第${num}章`,
+            order: num
+        });
+        
+        // 同步添加剧情梗概
+        this.data.synopsis.push({
+            id: 'syn-' + Date.now(),
+            chapterId: chapterId,
+            num: num,
+            title: `第${num}章`,
+            content: '',
+            image: null
+        });
+        
+        this.renderTimelineSettings(document.getElementById('main-container'));
+    },
+
+    saveTimelineSettings() {
+        this.saveData();
+        this.showToast('章节设置已保存', 'success');
+    },
+
+    // ========== 关系图 ==========
+    renderGraph(container) {
+        const tpl = document.getElementById('tpl-graph');
+        if (!tpl) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-400">关系图模板未找到</div>';
+            return;
+        }
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+        
+        // 简单的关系图渲染
+        const graphContainer = document.getElementById('graph-container');
+        if (graphContainer) {
+            // 获取所有角色词条
+            const characters = this.data.entries.filter(e => e.type === 'character');
+            
+            if (characters.length === 0) {
+                graphContainer.innerHTML = '<div class="text-center text-gray-400 py-10">暂无角色数据</div>';
+                return;
+            }
+            
+            // 渲染角色节点
+            characters.forEach(entry => {
+                const version = this.getVisibleVersion(entry);
+                if (!version) return;
+                
+                const node = document.createElement('div');
+                node.className = 'absolute bg-white rounded-lg shadow-md border border-gray-200 p-3 cursor-pointer hover:shadow-lg transition';
+                node.style.left = `${Math.random() * 60 + 10}%`;
+                node.style.top = `${Math.random() * 60 + 10}%`;
+                node.innerHTML = `
+                    <div class="text-sm font-medium text-gray-800">${version.title}</div>
+                    <div class="text-xs text-gray-500">${entry.code}</div>
+                `;
+                node.onclick = () => this.openEntry(entry.id);
+                graphContainer.appendChild(node);
+            });
+        }
+    },
+
+    // ========== 公告编辑 ==========
+    renderAnnouncementEdit(container) {
+        const tpl = document.getElementById('tpl-announcement-edit');
+        if (!tpl) {
+            container.innerHTML = '<div class="p-8 text-center text-gray-400">公告编辑模板未找到</div>';
+            return;
+        }
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+    },
+
+    saveAnnouncement() {
+        const title = document.getElementById('announcement-edit-title')?.value;
+        const author = document.getElementById('announcement-edit-author')?.value;
+        const content = document.getElementById('announcement-edit-content')?.value;
+
+        if (!title) {
+            this.showAlertDialog({
+                title: '信息不完整',
+                message: '请输入公告标题',
+                type: 'warning'
+            });
+            return;
+        }
+
+        const newAnn = {
+            id: 'ann-' + Date.now(),
+            title,
+            author,
+            content,
+            createdAt: Date.now(),
+            date: new Date().toLocaleDateString('zh-CN'),
+            isActive: true
+        };
+        
+        // 将其他公告设为非活跃
+        this.data.announcements.forEach(a => a.isActive = false);
+        this.data.announcements.unshift(newAnn);
+
+        this.saveData();
+        this.showToast('公告已发布', 'success');
+        this.router('home');
+    },
+
+    createAnnouncement() {
+        this.data.currentAnnouncement = null;
+        this.router('announcement-edit');
+    },
+
+    viewAnnouncement() {
+        const ann = this.data.announcements?.find(a => a.isActive);
+        if (!ann) {
+            this.showToast('当前没有生效的公告', 'info');
+            return;
+        }
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+                <div class="p-4 border-b bg-gradient-to-r from-orange-50 to-amber-50 flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-lg text-gray-800">${ann.title || '公告'}</h3>
+                        <p class="text-xs text-gray-500">${ann.author || '匿名'} · ${ann.date}</p>
+                    </div>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-6 overflow-y-auto prose prose-sm max-w-none">
+                    ${ann.content || ''}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    },
+
+    viewAnnouncementHistory() {
+        if (!this.data.announcements || this.data.announcements.length === 0) {
+            this.showToast('暂无历史公告', 'info');
+            return;
+        }
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col overflow-hidden">
+                <div class="p-4 border-b bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-lg text-gray-800">历史公告</h3>
+                    <button onclick="this.closest('.fixed').remove()" class="text-gray-400 hover:text-gray-600">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-4 overflow-y-auto space-y-3">
+                    ${this.data.announcements.map(ann => `
+                        <div class="p-3 bg-gray-50 rounded-lg border ${ann.isActive ? 'border-orange-300 bg-orange-50' : 'border-gray-200'}">
+                            <div class="flex justify-between items-start">
+                                <h4 class="font-medium text-gray-800">${ann.title || '无标题'}</h4>
+                                ${ann.isActive ? '<span class="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded">生效中</span>' : ''}
+                            </div>
+                            <p class="text-xs text-gray-500 mt-1">${ann.author || '匿名'} · ${ann.date}</p>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+    },
+
+    // ========== 词条操作 ==========
     createEntryCard(entry, version) {
         const div = document.createElement('div');
         div.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 active:scale-95 flex flex-col w-3/4 mx-auto';
         div.onclick = () => this.openEntry(entry.id);
-        
-        // 删除按钮（仅后台模式）
-        if (this.runMode === 'backend') {
-            const deleteBtn = document.createElement('button');
-            deleteBtn.className = 'absolute top-8 right-2 w-8 h-8 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg z-30 transition-all transform hover:scale-110 border-2 border-white';
-            deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can text-xs"></i>';
-            deleteBtn.onclick = async (e) => {
-                e.stopPropagation();
-                const confirmed = await this.showConfirmDialog({
-                    title: '删除确认',
-                    message: `确定删除 "${version.title}" (${entry.code})？`,
-                    confirmText: '删除',
-                    cancelText: '取消',
-                    type: 'danger'
-                });
-                if (confirmed) {
-                    this.deleteEntry(entry.id);
-                }
-            };
-            div.appendChild(deleteBtn);
-        }
         
         const img = version.images?.card || version.images?.avatar || version.image || '';
         const hasImage = img && (img.startsWith('data:') || img.startsWith('http'));
@@ -518,7 +1102,6 @@ const app = {
         return div;
     },
 
-    // ========== 词条操作 ==========
     openEntry(id) {
         this.data.editingId = id;
         this.router('detail');
@@ -539,13 +1122,18 @@ const app = {
         this.router('edit');
     },
 
+    switchToVersion(entryId, versionId) {
+        this.data.editingId = entryId;
+        this.data.viewingVersionId = versionId;
+        this.router('detail', false);
+    },
+
     // ========== 保存词条 ==========
     async saveEntry() {
         if (!this.tempEntry || !this.tempVersion) return;
         
-        // 收集表单数据
-        this.tempVersion.title = document.getElementById('edit-title').value.trim();
-        this.tempVersion.subtitle = document.getElementById('edit-subtitle').value.trim();
+        this.tempVersion.title = document.getElementById('edit-title')?.value?.trim() || '';
+        this.tempVersion.subtitle = document.getElementById('edit-subtitle')?.value?.trim() || '';
         
         if (!this.tempVersion.title) {
             this.showAlertDialog({
@@ -556,7 +1144,6 @@ const app = {
             return;
         }
         
-        // 更新或添加词条
         const existingIndex = this.data.entries.findIndex(e => e.id === this.tempEntry.id);
         if (existingIndex >= 0) {
             this.data.entries[existingIndex] = this.tempEntry;
@@ -564,47 +1151,24 @@ const app = {
             this.data.entries.push(this.tempEntry);
         }
         
-        // 保存到GitHub
         try {
             await this.githubStorage.saveWikiData(this.data);
             this.showToast('保存成功', 'success');
             this.editState.hasChanges = false;
+            this.unbindEditKeyboardShortcuts();
             this.tempEntry = null;
             this.tempVersion = null;
-            this.unbindEditKeyboardShortcuts();
             this.router('home');
         } catch (error) {
             console.error('保存失败:', error);
             this.showAlertDialog({
                 title: '保存失败',
-                message: '无法保存到GitHub，请检查网络连接',
+                message: '无法保存到GitHub: ' + error.message,
                 type: 'error'
             });
         }
     },
 
-    // ========== 删除词条 ==========
-    async deleteEntry(id) {
-        const index = this.data.entries.findIndex(e => e.id === id);
-        if (index >= 0) {
-            this.data.entries.splice(index, 1);
-            
-            try {
-                await this.githubStorage.saveWikiData(this.data);
-                this.showToast('删除成功', 'success');
-                this.router('home');
-            } catch (error) {
-                console.error('删除失败:', error);
-                this.showAlertDialog({
-                    title: '删除失败',
-                    message: '无法保存更改',
-                    type: 'error'
-                });
-            }
-        }
-    },
-
-    // ========== 取消编辑 ==========
     async cancelEdit() {
         if (!this.editState.hasChanges && this.editState.undoStack.length === 0) {
             this.unbindEditKeyboardShortcuts();
@@ -633,6 +1197,181 @@ const app = {
             this.editState.redoStack = [];
             this.router('home');
         }
+    },
+
+    // ========== 删除词条 ==========
+    async deleteEntry(id) {
+        const index = this.data.entries.findIndex(e => e.id === id);
+        if (index >= 0) {
+            this.data.entries.splice(index, 1);
+            
+            try {
+                await this.githubStorage.saveWikiData(this.data);
+                this.showToast('删除成功', 'success');
+                this.router('home');
+            } catch (error) {
+                console.error('删除失败:', error);
+                this.showAlertDialog({
+                    title: '删除失败',
+                    message: '无法保存更改',
+                    type: 'error'
+                });
+            }
+        }
+    },
+
+    // ========== 数据导入 ==========
+    async handleImportFolder(input) {
+        const files = input.files;
+        if (!files || files.length === 0) {
+            this.showImportStatus('请选择文件夹', 'error');
+            return;
+        }
+
+        this.showImportStatus('正在读取文件...', 'info');
+
+        // 查找数据文件（支持 data.json 或 wiki-manifest.json）
+        let dataFile = null;
+        const imageFiles = [];
+
+        for (const file of files) {
+            const path = file.webkitRelativePath || file.name;
+            // 支持 "Wiki数据/data.json"、"Wiki数据/wiki-manifest.json" 或直接 "data.json"
+            if ((path.endsWith('data.json') || path.endsWith('wiki-manifest.json')) && !path.includes('/wiki-images/')) {
+                dataFile = file;
+            }
+            // 收集图片文件（在 wiki-images 文件夹中）
+            if (path.includes('/wiki-images/') && file.type.startsWith('image/')) {
+                imageFiles.push(file);
+            }
+        }
+
+        if (!dataFile) {
+            this.showImportStatus('未找到数据文件（data.json 或 wiki-manifest.json），请确保选择了正确的"Wiki数据"文件夹', 'error');
+            return;
+        }
+
+        try {
+            const dataText = await dataFile.text();
+            const importedData = JSON.parse(dataText);
+
+            // 验证数据结构（支持多种格式）
+            if (!importedData.entries && !importedData.data) {
+                this.showImportStatus('数据格式不正确：缺少 entries 数组', 'error');
+                return;
+            }
+
+            // 处理不同格式的数据
+            const entries = importedData.entries || importedData.data?.entries || [];
+            const chapters = importedData.chapters || importedData.data?.chapters || [];
+            const camps = importedData.camps || importedData.data?.camps || [];
+            const synopsis = importedData.synopsis || importedData.data?.synopsis || [];
+            const announcements = importedData.announcements || importedData.data?.announcements || [];
+
+            this.showImportStatus(`找到 ${entries.length} 个词条，${imageFiles.length} 张图片，正在导入...`, 'info');
+
+            // 合并数据
+            const existingIds = new Set(this.data.entries.map(e => e.id));
+            let addedCount = 0;
+            let skippedCount = 0;
+
+            for (const entry of entries) {
+                if (!existingIds.has(entry.id)) {
+                    this.data.entries.push(entry);
+                    addedCount++;
+                } else {
+                    skippedCount++;
+                }
+            }
+
+            // 合并章节
+            const existingChapterIds = new Set(this.data.chapters.map(c => c.id));
+            for (const chapter of chapters) {
+                if (!existingChapterIds.has(chapter.id)) {
+                    this.data.chapters.push(chapter);
+                }
+            }
+
+            // 合并阵营
+            for (const camp of camps) {
+                if (!this.data.camps.includes(camp)) {
+                    this.data.camps.push(camp);
+                }
+            }
+
+            // 合并剧情梗概
+            const existingSynopsisIds = new Set(this.data.synopsis.map(s => s.id));
+            for (const syn of synopsis) {
+                if (!existingSynopsisIds.has(syn.id)) {
+                    this.data.synopsis.push(syn);
+                }
+            }
+
+            // 合并公告
+            const existingAnnIds = new Set(this.data.announcements.map(a => a.id));
+            for (const ann of announcements) {
+                if (!existingAnnIds.has(ann.id)) {
+                    this.data.announcements.push(ann);
+                }
+            }
+
+            // 导入标题和副标题
+            if (importedData.wikiTitle) this.data.wikiTitle = importedData.wikiTitle;
+            if (importedData.wikiSubtitle) this.data.wikiSubtitle = importedData.wikiSubtitle;
+
+            // 上传图片到 GitHub
+            let uploadedImages = 0;
+            if (imageFiles.length > 0) {
+                for (const imgFile of imageFiles) {
+                    try {
+                        const reader = new FileReader();
+                        const dataUrl = await new Promise((resolve, reject) => {
+                            reader.onload = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(imgFile);
+                        });
+
+                        await this.githubStorage.saveImage(imgFile.name, dataUrl);
+                        uploadedImages++;
+                    } catch (e) {
+                        console.warn('图片上传失败:', imgFile.name, e);
+                    }
+                }
+            }
+
+            // 保存到 GitHub
+            await this.githubStorage.saveWikiData(this.data);
+
+            this.showImportStatus(
+                `导入成功！新增 ${addedCount} 个词条${skippedCount > 0 ? `（跳过 ${skippedCount} 个重复）` : ''}，上传 ${uploadedImages}/${imageFiles.length} 张图片`,
+                'success'
+            );
+
+            this.updateUIForMode();
+            this.showToast('数据导入成功', 'success');
+
+        } catch (error) {
+            console.error('导入失败:', error);
+            this.showImportStatus('导入失败: ' + error.message, 'error');
+        }
+
+        input.value = '';
+    },
+
+    showImportStatus(message, type) {
+        const statusEl = document.getElementById('import-status');
+        if (!statusEl) return;
+
+        statusEl.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-blue-100', 'text-blue-700');
+
+        const colors = {
+            success: ['bg-green-100', 'text-green-700'],
+            error: ['bg-red-100', 'text-red-700'],
+            info: ['bg-blue-100', 'text-blue-700']
+        };
+
+        statusEl.classList.add(...(colors[type] || colors.info));
+        statusEl.textContent = message;
     },
 
     // ========== 分享码管理 ==========
@@ -743,10 +1482,9 @@ const app = {
         }
         
         const zip = new JSZip();
-        zip.file('data.json', JSON.stringify(this.data, null, 2));
+        zip.file('wiki-manifest.json', JSON.stringify(this.data, null, 2));
         
-        // 添加图片
-        const imagesFolder = zip.folder('images');
+        const imagesFolder = zip.folder('wiki-images');
         const imageList = await this.githubStorage.getImageList();
         
         for (const filename of imageList) {
@@ -770,157 +1508,6 @@ const app = {
         a.click();
         URL.revokeObjectURL(url);
         this.showToast('备份已导出', 'success');
-    },
-
-    // ========== 数据导入 ==========
-    async handleImportFolder(input) {
-        const files = input.files;
-        if (!files || files.length === 0) {
-            this.showImportStatus('请选择文件夹', 'error');
-            return;
-        }
-
-        const statusEl = document.getElementById('import-status');
-        this.showImportStatus('正在读取文件...', 'info');
-
-        // 查找 data.json 文件
-        let dataFile = null;
-        const imageFiles = [];
-
-        for (const file of files) {
-            const path = file.webkitRelativePath || file.name;
-            // 支持 "Wiki数据/data.json" 或直接 "data.json"
-            if (path.endsWith('data.json') && !path.includes('/wiki-images/')) {
-                dataFile = file;
-            }
-            // 收集图片文件（在 wiki-images 文件夹中）
-            if (path.includes('/wiki-images/') && file.type.startsWith('image/')) {
-                imageFiles.push(file);
-            }
-        }
-
-        if (!dataFile) {
-            this.showImportStatus('未找到 data.json 文件，请确保选择了正确的"Wiki数据"文件夹', 'error');
-            return;
-        }
-
-        try {
-            // 读取并解析 data.json
-            const dataText = await dataFile.text();
-            const importedData = JSON.parse(dataText);
-
-            // 验证数据结构
-            if (!importedData.entries || !Array.isArray(importedData.entries)) {
-                this.showImportStatus('数据格式不正确：缺少 entries 数组', 'error');
-                return;
-            }
-
-            this.showImportStatus(`找到 ${importedData.entries.length} 个词条，${imageFiles.length} 张图片，正在导入...`, 'info');
-
-            // 合并数据（保留现有数据，添加新数据）
-            const existingIds = new Set(this.data.entries.map(e => e.id));
-            let addedCount = 0;
-            let skippedCount = 0;
-
-            for (const entry of importedData.entries) {
-                if (!existingIds.has(entry.id)) {
-                    this.data.entries.push(entry);
-                    addedCount++;
-                } else {
-                    skippedCount++;
-                }
-            }
-
-            // 合并其他数据（章节、阵营、剧情梗概等）
-            if (importedData.chapters && importedData.chapters.length > 0) {
-                const existingChapterIds = new Set(this.data.chapters.map(c => c.id));
-                for (const chapter of importedData.chapters) {
-                    if (!existingChapterIds.has(chapter.id)) {
-                        this.data.chapters.push(chapter);
-                    }
-                }
-            }
-
-            if (importedData.camps && importedData.camps.length > 0) {
-                for (const camp of importedData.camps) {
-                    if (!this.data.camps.includes(camp)) {
-                        this.data.camps.push(camp);
-                    }
-                }
-            }
-
-            if (importedData.synopsis && importedData.synopsis.length > 0) {
-                const existingSynopsisIds = new Set(this.data.synopsis.map(s => s.id));
-                for (const syn of importedData.synopsis) {
-                    if (!existingSynopsisIds.has(syn.id)) {
-                        this.data.synopsis.push(syn);
-                    }
-                }
-            }
-
-            // 导入标题和副标题（如果当前为空）
-            if (importedData.wikiTitle && !this.data.wikiTitle) {
-                this.data.wikiTitle = importedData.wikiTitle;
-            }
-            if (importedData.wikiSubtitle && !this.data.wikiSubtitle) {
-                this.data.wikiSubtitle = importedData.wikiSubtitle;
-            }
-
-            // 上传图片到 GitHub
-            let uploadedImages = 0;
-            if (imageFiles.length > 0) {
-                for (const imgFile of imageFiles) {
-                    try {
-                        const reader = new FileReader();
-                        const dataUrl = await new Promise((resolve, reject) => {
-                            reader.onload = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(imgFile);
-                        });
-
-                        await this.githubStorage.saveImage(imgFile.name, dataUrl);
-                        uploadedImages++;
-                    } catch (e) {
-                        console.warn('图片上传失败:', imgFile.name, e);
-                    }
-                }
-            }
-
-            // 保存到 GitHub
-            await this.githubStorage.saveWikiData(this.data);
-
-            this.showImportStatus(
-                `导入成功！新增 ${addedCount} 个词条${skippedCount > 0 ? `（跳过 ${skippedCount} 个重复）` : ''}，上传 ${uploadedImages}/${imageFiles.length} 张图片`,
-                'success'
-            );
-
-            // 刷新页面显示
-            this.updateUIForMode();
-            this.showToast('数据导入成功', 'success');
-
-        } catch (error) {
-            console.error('导入失败:', error);
-            this.showImportStatus('导入失败: ' + error.message, 'error');
-        }
-
-        // 清空 input 以便下次选择同一文件夹
-        input.value = '';
-    },
-
-    showImportStatus(message, type) {
-        const statusEl = document.getElementById('import-status');
-        if (!statusEl) return;
-
-        statusEl.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-red-100', 'text-red-700', 'bg-blue-100', 'text-blue-700');
-
-        const colors = {
-            success: ['bg-green-100', 'text-green-700'],
-            error: ['bg-red-100', 'text-red-700'],
-            info: ['bg-blue-100', 'text-blue-700']
-        };
-
-        statusEl.classList.add(...(colors[type] || colors.info));
-        statusEl.textContent = message;
     },
 
     // ========== 字体设置 ==========
@@ -958,6 +1545,22 @@ const app = {
         return chapter ? chapter.order : -1;
     },
 
+    formatChapterNum(num) {
+        if (num === undefined || num === null) return '';
+        if (typeof num === 'string') return num;
+        return `第${num}章`;
+    },
+
+    generateCode(type) {
+        const prefix = type === 'character' ? 'C' : 'S';
+        const existing = this.data.entries.filter(e => e.type === type);
+        const maxNum = existing.reduce((max, e) => {
+            const match = e.code.match(/\d+/);
+            return match ? Math.max(max, parseInt(match[0])) : max;
+        }, 0);
+        return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
+    },
+
     searchAndOpen(name) {
         const entry = this.data.entries.find(e => {
             const v = this.getVisibleVersion(e);
@@ -971,13 +1574,40 @@ const app = {
         }
     },
 
+    // ========== 键盘快捷键 ==========
+    bindEditKeyboardShortcuts() {
+        const handler = (e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+                e.preventDefault();
+                this.saveEntry();
+            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
+                e.preventDefault();
+                this.undo();
+            }
+        };
+        
+        document.addEventListener('keydown', handler);
+        this._editKeyHandler = handler;
+    },
+
+    unbindEditKeyboardShortcuts() {
+        if (this._editKeyHandler) {
+            document.removeEventListener('keydown', this._editKeyHandler);
+            this._editKeyHandler = null;
+        }
+    },
+
+    undo() {
+        this.showToast('撤销功能开发中', 'info');
+    },
+
     // ========== 弹窗系统 ==========
     showConfirmDialog(options) {
         return new Promise((resolve) => {
             const { title = '确认', message, confirmText = '确认', cancelText = '取消', type = 'info' } = options;
             
             const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay fade-in';
+            overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
             
             const iconColors = {
                 info: 'text-blue-600 bg-blue-100',
@@ -994,7 +1624,7 @@ const app = {
             };
             
             overlay.innerHTML = `
-                <div class="modal-content p-6">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform">
                     <div class="text-center mb-6">
                         <div class="w-16 h-16 ${iconColors[type]} rounded-full flex items-center justify-center mx-auto mb-4">
                             <i class="fa-solid ${icons[type]} text-2xl"></i>
@@ -1039,7 +1669,7 @@ const app = {
             const { title = '提示', message, confirmText = '确定', type = 'info' } = options;
             
             const overlay = document.createElement('div');
-            overlay.className = 'modal-overlay fade-in';
+            overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
             
             const iconColors = {
                 info: 'text-blue-600 bg-blue-100',
@@ -1056,7 +1686,7 @@ const app = {
             };
             
             overlay.innerHTML = `
-                <div class="modal-content p-6">
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 transform scale-100 transition-transform">
                     <div class="text-center mb-6">
                         <div class="w-16 h-16 ${iconColors[type]} rounded-full flex items-center justify-center mx-auto mb-4">
                             <i class="fa-solid ${icons[type]} text-2xl"></i>
@@ -1167,134 +1797,22 @@ const app = {
         }, 200);
     },
 
-    // ========== 编辑页面渲染 ==========
-    renderEdit(container) {
-        const isNew = !this.data.editingId;
-        
-        // 初始化临时数据
-        if (isNew) {
-            const type = this.data.editingType || 'character';
-            const code = this.generateCode(type);
-            
-            this.tempEntry = {
-                id: (type === 'character' ? 'char-' : 'non-') + Date.now(),
-                type: type,
-                code: code,
-                versions: []
-            };
-            
-            this.tempVersion = {
-                vid: 'v-' + Date.now(),
-                title: '',
-                subtitle: '',
-                level: 5,
-                images: { avatar: null, card: null, cover: null },
-                chapterFrom: null,
-                chapterTo: null,
-                blocks: [],
-                createdAt: Date.now()
-            };
-            
-            this.tempEntry.versions.push(this.tempVersion);
-            this.editingVersionId = this.tempVersion.vid;
-            this.editState.hasChanges = true;
-        } else {
-            const entry = this.data.entries.find(e => e.id === this.data.editingId);
-            this.tempEntry = JSON.parse(JSON.stringify(entry));
-            this.tempVersion = JSON.parse(JSON.stringify(entry.versions[entry.versions.length - 1]));
-            this.editingVersionId = this.tempVersion.vid;
-            this.editState.originalEntry = JSON.parse(JSON.stringify(entry));
-            this.editState.originalVersion = JSON.parse(JSON.stringify(this.tempVersion));
-            this.editState.hasChanges = false;
-        }
-        
-        this.editState.undoStack = [];
-        this.editState.redoStack = [];
-        
-        const tpl = document.getElementById('tpl-detail-edit');
-        if (!tpl) return;
-        
-        const clone = tpl.content.cloneNode(true);
-        
-        clone.getElementById('edit-breadcrumb-title').textContent = isNew ? '新词条' : this.tempVersion.title;
-        clone.getElementById('edit-title').value = this.tempVersion.title;
-        clone.getElementById('edit-code').value = this.tempEntry.code;
-        clone.getElementById('edit-subtitle').value = this.tempVersion.subtitle || '';
-        
-        // 绑定键盘快捷键
-        this.bindEditKeyboardShortcuts();
-        
-        container.appendChild(clone);
-    },
-
-    bindEditKeyboardShortcuts() {
-        const handler = (e) => {
-            if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
-                e.preventDefault();
-                this.saveEntry();
-            } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !e.shiftKey) {
-                e.preventDefault();
-                this.undo();
-            }
-        };
-        
-        document.addEventListener('keydown', handler);
-        this._editKeyHandler = handler;
-    },
-
-    unbindEditKeyboardShortcuts() {
-        if (this._editKeyHandler) {
-            document.removeEventListener('keydown', this._editKeyHandler);
-            this._editKeyHandler = null;
-        }
-    },
-
-    undo() {
-        this.showToast('撤销功能开发中', 'info');
-    },
-
-    // ========== 编号生成 ==========
-    generateCode(type) {
-        const prefix = type === 'character' ? 'C' : 'S';
-        const existing = this.data.entries.filter(e => e.type === type);
-        const maxNum = existing.reduce((max, e) => {
-            const match = e.code.match(/\d+/);
-            return match ? Math.max(max, parseInt(match[0])) : max;
-        }, 0);
-        return `${prefix}${String(maxNum + 1).padStart(3, '0')}`;
-    },
-
-    // ========== 模式切换 ==========
-    setMode(mode) {
-        this.data.currentMode = mode;
-        document.getElementById('btn-mode-view').className = mode === 'view' 
-            ? 'px-3 py-1.5 rounded-md bg-white shadow-sm text-gray-800 transition-all'
-            : 'px-3 py-1.5 rounded-md text-gray-500 hover:text-gray-800 transition-all';
-        document.getElementById('btn-mode-edit').className = mode === 'edit'
-            ? 'px-3 py-1.5 rounded-md bg-white shadow-sm text-gray-800 transition-all'
-            : 'px-3 py-1.5 rounded-md text-gray-500 hover:text-gray-800 transition-all';
-    },
-
-    // ========== 公告管理 ==========
-    createAnnouncement() {
-        this.showToast('公告功能在GitHub版暂未开放', 'info');
-    },
-
-    viewAnnouncement() {
-        this.showToast('暂无生效的公告', 'info');
-    },
-
-    viewAnnouncementHistory() {
-        this.showToast('暂无历史公告', 'info');
-    },
-
     // ========== 首页自定义内容 ==========
     addHomeTextBox() {
-        this.showToast('首页自定义功能在GitHub版暂未开放', 'info');
+        if (!this.data.homeContent) this.data.homeContent = [];
+        this.data.homeContent.push({ type: 'text', content: '' });
+        this.renderHomeCustomContent();
     },
 
     addHomeEntryRef() {
-        this.showToast('首页自定义功能在GitHub版暂未开放', 'info');
+        this.showEntrySelectDialog((entry) => {
+            if (!entry) return;
+            const visibleVersion = this.getVisibleVersion(entry);
+            const title = visibleVersion ? visibleVersion.title : entry.code;
+            if (!this.data.homeContent) this.data.homeContent = [];
+            this.data.homeContent.push({ type: 'entry-ref', entryId: entry.id, title: title });
+            this.renderHomeCustomContent();
+        });
     },
 
     showEntrySelectDialog(callback) {
@@ -1344,77 +1862,55 @@ const app = {
         overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
     },
 
+    updateHomeText(idx, value) {
+        if (this.data.homeContent && this.data.homeContent[idx]) {
+            this.data.homeContent[idx].content = value;
+        }
+    },
+
+    removeHomeItem(idx) {
+        if (this.data.homeContent) {
+            this.data.homeContent.splice(idx, 1);
+            this.renderHomeCustomContent();
+        }
+    },
+
     saveHomeContent() {
+        this.saveData();
         this.showToast('首页内容已保存', 'success');
     },
 
-    // ========== 备份恢复 ==========
-    showBackupRestoreDialog() {
-        this.showConfirmDialog({
-            title: '备份与恢复',
-            message: '请选择操作：',
-            confirmText: '导出备份',
-            cancelText: '取消',
-            type: 'info'
-        }).then(confirmed => {
-            if (confirmed) {
-                this.exportZipBackup();
-            }
-        });
-    },
-
-    // ========== 版本管理器 ==========
+    // ========== 版本管理器（占位）==========
     showVersionManager() {
         this.showToast('版本管理器功能开发中', 'info');
     },
 
-    closeVersionManager() {
-        // 关闭版本管理弹窗
-    },
-
-    createNewVersionFromManager() {
-        this.showToast('创建新版本功能开发中', 'info');
-    },
-
-    mergeVersions() {
-        this.showToast('合并版本功能开发中', 'info');
-    },
-
-    // ========== 关联角色和版本 ==========
-    addRelatedCharacter() {
-        this.showToast('添加关联角色功能开发中', 'info');
-    },
-
-    addRelatedVersion() {
-        this.showToast('添加关联版本功能开发中', 'info');
-    },
-
-    // ========== 内容块操作 ==========
-    addBlock(type) {
-        if (!this.tempVersion) return;
-        if (!this.tempVersion.blocks) this.tempVersion.blocks = [];
-        
-        this.tempVersion.blocks.push({
-            type: type,
-            text: ''
-        });
-        
-        // 重新渲染编辑页面
-        this.renderEdit(document.getElementById('main-container'));
-    },
-
-    // ========== 阵营管理 ==========
-    quickAddCamp() {
-        const name = prompt('输入新阵营名称：');
-        if (name && !this.data.camps.includes(name)) {
-            this.data.camps.push(name);
-            this.showToast('阵营已添加', 'success');
+    // ========== 保存数据 ==========
+    async saveData() {
+        try {
+            await this.githubStorage.saveWikiData(this.data);
+        } catch (error) {
+            console.error('保存失败:', error);
         }
     },
 
-    addCamp() {
-        this.quickAddCamp();
+    // ========== 模式切换 ==========
+    setMode(mode) {
+        this.data.currentMode = mode;
+        const viewBtn = document.getElementById('btn-mode-view');
+        const editBtn = document.getElementById('btn-mode-edit');
+        
+        if (viewBtn) {
+            viewBtn.className = mode === 'view' 
+                ? 'px-3 py-1.5 rounded-md bg-white shadow-sm text-gray-800 transition-all'
+                : 'px-3 py-1.5 rounded-md text-gray-500 hover:text-gray-800 transition-all';
+        }
+        if (editBtn) {
+            editBtn.className = mode === 'edit'
+                ? 'px-3 py-1.5 rounded-md bg-white shadow-sm text-gray-800 transition-all'
+                : 'px-3 py-1.5 rounded-md text-gray-500 hover:text-gray-800 transition-all';
+        }
     }
 };
 
-console.log('GitHub Wiki Core 加载完成');
+console.log('GitHub Wiki Core v2.0 加载完成');
