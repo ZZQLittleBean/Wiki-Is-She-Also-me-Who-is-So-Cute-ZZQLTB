@@ -954,22 +954,6 @@ Object.assign(window.app, {
         let dataFile = null;
         const imageFiles = [];
         // 在导入处理中修改图片保存部分
-        for (const {file, fileName} of imageFiles) {
-            try {
-                const reader = new FileReader();
-                const dataUrl = await new Promise((resolve, reject) => {
-                    reader.onload = () => resolve(reader.result);
-                    reader.onerror = reject;
-                    reader.readAsDataURL(file);
-                });
-                
-                // 保存到存储，使用原始文件名
-                await this.githubStorage.saveImage(fileName, dataUrl);
-                uploadedImages++;
-            } catch (e) {
-                console.warn('图片上传失败:', fileName, e);
-            }
-        }
         for (const file of files) {
             const path = file.webkitRelativePath || file.name;
             // 支持多种路径格式
