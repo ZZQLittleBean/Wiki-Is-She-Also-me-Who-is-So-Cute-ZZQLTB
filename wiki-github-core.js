@@ -3,7 +3,13 @@
  * 功能：前后台模式分离，GitHub存储，完整功能支持
  */
 
-const app = {
+// 确保 app 对象存在（与 storage.js 共享同一个对象）
+if (typeof window.app === 'undefined') {
+    window.app = {};
+}
+
+// 扩展 app 对象
+Object.assign(window.app, {
     // ========== 应用状态 ==========
     data: {
         entries: [],
@@ -1911,6 +1917,6 @@ const app = {
                 : 'px-3 py-1.5 rounded-md text-gray-500 hover:text-gray-800 transition-all';
         }
     }
-};
+});
 
 console.log('GitHub Wiki Core v2.0 加载完成');
