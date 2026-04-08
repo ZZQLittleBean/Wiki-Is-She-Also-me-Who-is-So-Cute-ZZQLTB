@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>小说百科 Wiki 系统 - GitHub版</title>
+    <title>小说百科 Wiki 系统 - demov2.6 GitHub-vision</title>
     <script>
         // 全局错误捕获
         window.onerror = function(msg, url, line, col, error) {
@@ -323,6 +323,17 @@
 
                 <!-- 首页自定义内容区域 -->
                 <div id="home-custom-content" class="space-y-3"></div>
+                
+                <!-- 后台模式入口（仅前台模式显示） -->
+                <div id="backend-entry-section" class="mt-8 pt-6 border-t border-gray-200">
+                    <div class="bg-gray-50 rounded-xl p-4 text-center">
+                        <p class="text-gray-500 text-sm mb-3">需要编辑Wiki内容？</p>
+                        <button onclick="app.showBackendLoginFromHome()" class="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm hover:bg-indigo-700 transition">
+                            <i class="fa-solid fa-lock"></i>
+                            进入后台模式
+                        </button>
+                    </div>
+                </div>
             </div>
         </div>
     </template>

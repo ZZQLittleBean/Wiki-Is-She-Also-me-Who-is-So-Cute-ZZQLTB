@@ -58,6 +58,9 @@ Object.assign(window.app, {
 
     // ========== 初始化 ==========
     init() {
+        // 绑定 GitHub 存储管理器
+        this.githubStorage = window.WikiGitHubStorage;
+        
         // 检查是否有保存的后台登录状态
         const savedLogin = localStorage.getItem('wiki_backend_login');
         if (savedLogin) {
@@ -99,9 +102,35 @@ Object.assign(window.app, {
         container.innerHTML = '';
         container.appendChild(clone);
         
-        // 显示前台模式入口
-        document.getElementById('frontend-login-btn').onclick = () => this.enterFrontendMode();
-        document.getElementById('backend-login-btn').onclick = () => this.showBackendLogin();
+        // 直接显示分享码登录表单（前台模式）
+        document.getElementById('login-options').classList.add('hidden');
+        document.getElementById('share-code-form').classList.remove('hidden');
+        
+        // 添加后台入口链接
+        const shareForm = document.getElementById('share-code-form');
+        const backendLink = document.createElement('div');
+        backendLink.className = 'text-center mt-4 pt-4 border-t border-gray-100';
+        backendLink.innerHTML = `
+            <button onclick="app.showBackendLogin()" class="text-sm text-gray-400 hover:text-indigo-600 transition flex items-center justify-center gap-1 mx-auto">
+                <i class="fa-solid fa-lock text-xs"></i>
+                后台模式登录
+            </button>
+        `;
+        shareForm.appendChild(backendLink);
+        
+        // 聚焦输入框
+        setTimeout(() => {
+            const input = document.getElementById('share-code-input');
+            if (input) input.focus();
+        }, 100);
+    },
+
+    // 从主页进入后台登录
+    showBackendLoginFromHome() {
+        this.showLoginPage();
+        setTimeout(() => {
+            this.showBackendLogin();
+        }, 50);
     },
 
     // 进入前台模式（分享码登录）
@@ -112,15 +141,14 @@ Object.assign(window.app, {
 
     // 显示后台登录
     showBackendLogin() {
-        document.getElementById('login-options').classList.add('hidden');
+        document.getElementById('share-code-form').classList.add('hidden');
         document.getElementById('backend-login-form').classList.remove('hidden');
     },
 
-    // 返回登录选项
+    // 返回登录选项（返回分享码登录）
     showLoginOptions() {
-        document.getElementById('share-code-form').classList.add('hidden');
         document.getElementById('backend-login-form').classList.add('hidden');
-        document.getElementById('login-options').classList.remove('hidden');
+        document.getElementById('share-code-form').classList.remove('hidden');
     },
 
     // 后台模式登录
@@ -392,6 +420,12 @@ Object.assign(window.app, {
         clone.querySelectorAll('.edit-only').forEach(el => {
             el.classList.toggle('hidden', this.runMode !== 'backend');
         });
+        
+        // 显示/隐藏后台入口区域（仅前台模式显示）
+        const backendEntry = clone.getElementById('backend-entry-section');
+        if (backendEntry) {
+            backendEntry.classList.toggle('hidden', this.runMode === 'backend');
+        }
         
         container.appendChild(clone);
         
