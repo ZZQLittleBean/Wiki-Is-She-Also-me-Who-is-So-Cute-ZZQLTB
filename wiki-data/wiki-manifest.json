@@ -176,7 +176,32 @@
     "主角团",
     "反派组织"
   ],
-  "synopsis": [],
+  "synopsis": [
+    {
+      "id": "syn-1775735383426-4t22a",
+      "chapterId": "ch-0",
+      "num": 0,
+      "title": "序章",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775735383426-1q0bw",
+      "chapterId": "ch-1",
+      "num": 1,
+      "title": "第一章：觉醒",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775735383426-jqakb",
+      "chapterId": "ch-2",
+      "num": 2,
+      "title": "第二章：变身",
+      "content": "",
+      "image": null
+    }
+  ],
   "announcements": [
     {
       "id": "ann-1775652563395",
@@ -189,7 +214,7 @@
   ],
   "currentTimeline": "latest",
   "currentMode": "edit",
-  "editingId": null,
+  "editingId": "char-1775652383839",
   "editingType": null,
   "viewingVersionId": null,
   "wikiTitle": "未命名 Wiki",
