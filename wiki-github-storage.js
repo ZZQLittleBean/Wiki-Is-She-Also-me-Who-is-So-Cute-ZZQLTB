@@ -58,142 +58,160 @@
 
         async getFile(path) {
             try {
-                const url = `${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}?ref=${this.config.branch}`;
-                const response = await fetch(url, {
-                    method: 'GET',
-                    headers: this.getHeaders()
-                });
-
+                const response = await fetch(
+                    `${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}?ref=${this.config.branch}`,
+                    { headers: this.getHeaders() }
+                );
+                
                 if (response.status === 404) {
-                    console.log(`[GitHub] 文件 ${path} 不存在（404），将创建新文件`);
-                    return null; // 文件不存在，返回 null 表示新建
+                    return null; // 文件不存在，返回 null
                 }
-
+                
                 if (!response.ok) {
-                    throw new Error(`GitHub API ${response.status}`);
+                    throw new Error(`GET ${response.status}`);
                 }
-
+                
                 const data = await response.json();
-                
-                if (!data.content) {
-                    console.warn(`[GitHub] 文件 ${path} 无 content 字段`);
-                    return null;
-                }
-                
-                // 清理 base64 并解码
-                const cleanBase64 = data.content.replace(/\s/g, '');
-                const content = atob(cleanBase64);
-                
-                return { 
-                    content, 
-                    sha: data.sha,
-                    size: data.size 
+                return {
+                    sha: data.sha,      // 这是更新文件必需的
+                    content: data.content ? atob(data.content.replace(/\s/g, '')) : null
                 };
-                
-            } catch (error) {
-                console.error(`[GitHub] 获取文件 ${path} 失败:`, error.message);
-                // 对于 404 返回 null，其他错误抛出
-                if (error.message.includes('404')) return null;
-                throw error;
+            } catch (e) {
+                console.log(`[GitHub] getFile ${path}: ${e.message}`);
+                return null; // 任何错误都视为文件不存在
             }
         },
 
-        async putFile(path, content, message = 'Update via Wiki', isBinary = false, retryCount = 3) {
-            try {
-                // 【关键】严格获取 SHA，区分新建和更新
-                let sha = null;
-                let isNewFile = false;
+        // 终极简化 putFile - 严格区分新建和更新
+        async putFile(path, content, message = 'Update via Wiki', isBinary = false) {
+            const maxRetries = 3;
+            let attempt = 0;
+            
+            while (attempt < maxRetries) {
+                attempt++;
                 
                 try {
+                    // 步骤 1: 确定是新建还是更新，获取 SHA
+                    let sha = null;
                     const existing = await this.getFile(path);
+                    
                     if (existing && existing.sha) {
                         sha = existing.sha;
-                        console.log(`[GitHub] 更新现有文件 ${path}, SHA: ${sha.substring(0, 8)}`);
+                        console.log(`[GitHub] 文件存在，更新模式，SHA: ${sha.substring(0, 7)}`);
                     } else {
-                        isNewFile = true;
-                        console.log(`[GitHub] 创建新文件 ${path}`);
+                        console.log(`[GitHub] 文件不存在，新建模式`);
                     }
-                } catch (e) {
-                    // 如果 getFile 报错（非 404），可能是网络问题，保守起见尝试更新
-                    console.warn(`[GitHub] 获取 ${path} SHA 时出错，假设为更新:`, e.message);
+
+                    // 步骤 2: 准备内容
+                    let encodedContent;
+                    if (isBinary) {
+                        encodedContent = content.replace(/\s/g, '');
+                    } else {
+                        const bytes = new TextEncoder().encode(content);
+                        const binary = Array.from(bytes, b => String.fromCharCode(b)).join('');
+                        encodedContent = btoa(binary);
+                    }
+
+                    // 步骤 3: 构建请求体（关键：只有有 SHA 时才加）
+                    const body = {
+                        message: message,
+                        content: encodedContent,
+                        branch: this.config.branch
+                    };
+                    
+                    if (sha) {
+                        body.sha = sha;  // 【关键】这行必须执行
+                    }
+
+                    console.log(`[GitHub] PUT ${path} (${(encodedContent.length/1024).toFixed(1)}KB)，尝试 ${attempt}/${maxRetries}`);
+
+                    // 步骤 4: 发送请求
+                    const response = await fetch(
+                        `${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}`,
+                        {
+                            method: 'PUT',
+                            headers: this.getHeaders(),
+                            body: JSON.stringify(body)
+                        }
+                    );
+
+                    // 步骤 5: 处理 422（SHA 不匹配）
+                    if (response.status === 422) {
+                        const err = await response.json().catch(() => ({}));
+                        console.error('[GitHub] 422 错误:', err.message || '未知');
+                        
+                        if (err.message && err.message.includes('sha')) {
+                            console.log('[GitHub] SHA 无效，等待后重试...');
+                            await new Promise(r => setTimeout(r, 2000 * attempt));
+                            continue; // 重试
+                        }
+                        throw new Error(`422: ${err.message}`);
+                    }
+
+                    // 步骤 6: 处理 409（冲突）
+                    if (response.status === 409) {
+                        console.log('[GitHub] 409 冲突，等待后重试...');
+                        await new Promise(r => setTimeout(r, 3000));
+                        continue; // 重试
+                    }
+
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+
+                    console.log(`[GitHub] ✅ ${path} 保存成功`);
+                    return await response.json();
+                    
+                } catch (error) {
+                    if (attempt >= maxRetries) {
+                        console.error(`[GitHub] 最终失败: ${error.message}`);
+                        throw error;
+                    }
+                    console.warn(`[GitHub] 尝试 ${attempt} 失败，重试...`);
+                    await new Promise(r => setTimeout(r, 1000 * attempt));
                 }
+            }
+            
+            throw new Error('超过最大重试次数');
+        },
 
-                // 编码内容
-                let encodedContent;
-                if (isBinary) {
-                    // 清理已有的 base64
-                    encodedContent = content.replace(/\s/g, '');
-                } else {
-                    // UTF-8 转 base64
-                    const utf8Bytes = new TextEncoder().encode(content);
-                    const binaryString = Array.from(utf8Bytes, byte => String.fromCharCode(byte)).join('');
-                    encodedContent = btoa(binaryString);
-                }
-
-                // 检查大小（GitHub 硬限制 100MB）
-                const sizeInMB = (encodedContent.length * 0.75) / 1024 / 1024;
-                if (sizeInMB > 99) {
-                    throw new Error(`文件过大: ${sizeInMB.toFixed(2)}MB，超过 GitHub 100MB 限制`);
-                }
-
-                // 构建请求体
-                const body = {
-                    message: message,
-                    content: encodedContent,
-                    branch: this.config.branch
-                };
-                
-                // 【关键】只有确认是更新且获取到 SHA 时才添加 sha 字段
-                if (!isNewFile && sha) {
-                    body.sha = sha;
-                }
-
-                console.log(`[GitHub] 正在 ${isNewFile ? '创建' : '更新'} ${path} (${sizeInMB.toFixed(2)}MB)`);
-
-                const response = await fetch(`${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}`, {
+        // 【新增】专门用于保存图片的简化方法
+        async saveImage(filename, dataUrl) {
+            // 提取 base64 部分
+            let base64 = dataUrl;
+            if (dataUrl.includes(',')) {
+                base64 = dataUrl.split(',')[1];
+            }
+            
+            // 清理并确保格式正确
+            base64 = base64.replace(/\s/g, '').trim();
+            
+            // 图片使用二进制模式（已经是 base64，不要再次编码）
+            await this.putFile(`images/${filename}`, base64, `Add image ${filename}`, true);
+            return true;
+        },
+        // 【备选】强制创建新文件（不检查 SHA，用于紧急情况）
+        async putFileForceNew(path, content, message = 'Create new file') {
+            const body = {
+                message: message,
+                content: btoa(unescape(encodeURIComponent(content))), // 强制编码
+                branch: this.config.branch
+                // 故意不写 sha，强制创建
+            };
+            
+            const response = await fetch(
+                `${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}`,
+                {
                     method: 'PUT',
                     headers: this.getHeaders(),
                     body: JSON.stringify(body)
-                });
-
-                // 处理 422 错误（通常是 SHA 不匹配或内容问题）
-                if (response.status === 422) {
-                    const errorData = await response.json().catch(() => ({}));
-                    console.error('[GitHub] 422 错误详情:', errorData);
-                    
-                    // 如果是 SHA 问题且还有重试次数
-                    if (errorData.message && errorData.message.includes('sha') && retryCount > 0) {
-                        console.warn(`[GitHub] SHA 不匹配，重新获取后重试 (${retryCount})...`);
-                        await new Promise(r => setTimeout(r, 1500));
-                        // 强制重新获取 SHA
-                        const fresh = await this.getFile(path).catch(() => null);
-                        if (fresh && fresh.sha) {
-                            return this.putFile(path, content, message, isBinary, retryCount - 1);
-                        }
-                    }
-                    
-                    throw new Error(`GitHub 422: ${errorData.message || '内容格式错误或 SHA 无效'}`);
                 }
-
-                // 处理 409 冲突
-                if (response.status === 409 && retryCount > 0) {
-                    console.warn(`[GitHub] 409 冲突，延迟后重试...`);
-                    await new Promise(r => setImmediate(r, 2000));
-                    return this.putFile(path, content, message, isBinary, retryCount - 1);
-                }
-
-                if (!response.ok) {
-                    throw new Error(`GitHub API ${response.status}`);
-                }
-
-                const result = await response.json();
-                console.log(`[GitHub] ✅ ${path} 保存成功`);
-                return result;
-                
-            } catch (error) {
-                console.error(`[GitHub] 保存 ${path} 失败:`, error.message);
-                throw error;
+            );
+            
+            if (!response.ok) {
+                throw new Error(`Force create failed: ${response.status}`);
             }
+            return response.json();
         },
 
 
