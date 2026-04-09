@@ -56,76 +56,78 @@
             };
         },
 
+        // 替换 getFile 方法（正确解码 UTF-8）
         async getFile(path) {
             try {
                 const response = await fetch(
                     `${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}?ref=${this.config.branch}`,
                     { headers: this.getHeaders() }
                 );
-                
-                if (response.status === 404) {
-                    return null; // 文件不存在，返回 null
-                }
-                
-                if (!response.ok) {
-                    throw new Error(`GET ${response.status}`);
-                }
-                
+
+                if (response.status === 404) return null;
+                if (!response.ok) throw new Error(`GET ${response.status}`);
+
                 const data = await response.json();
-                return {
-                    sha: data.sha,      // 这是更新文件必需的
-                    content: data.content ? atob(data.content.replace(/\s/g, '')) : null
-                };
+                if (!data.content) return null;
+
+                // 【关键修复】正确解码 Base64 → UTF-8
+                const cleanBase64 = data.content.replace(/\s/g, '');
+                const binaryString = atob(cleanBase64);
+                
+                // 将二进制字符串转换为 Uint8Array，再用 TextDecoder 解码为 UTF-8
+                const bytes = new Uint8Array(binaryString.length);
+                for (let i = 0; i < binaryString.length; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                const content = new TextDecoder('utf-8').decode(bytes);
+                
+                return { content, sha: data.sha };
+                
             } catch (e) {
-                console.log(`[GitHub] getFile ${path}: ${e.message}`);
-                return null; // 任何错误都视为文件不存在
+                console.error(`[GitHub] getFile ${path}: ${e.message}`);
+                return null;
             }
         },
 
-        // 终极简化 putFile - 严格区分新建和更新
-        async putFile(path, content, message = 'Update via Wiki', isBinary = false) {
-            const maxRetries = 3;
+        // 替换 putFile 方法（正确编码 UTF-8）
+        async putFile(path, content, message = 'Update via Wiki', isBinary = false, retryCount = 3) {
             let attempt = 0;
             
-            while (attempt < maxRetries) {
+            while (attempt < retryCount) {
                 attempt++;
                 
                 try {
-                    // 步骤 1: 确定是新建还是更新，获取 SHA
+                    // 获取现有文件 SHA
                     let sha = null;
                     const existing = await this.getFile(path);
-                    
                     if (existing && existing.sha) {
                         sha = existing.sha;
-                        console.log(`[GitHub] 文件存在，更新模式，SHA: ${sha.substring(0, 7)}`);
-                    } else {
-                        console.log(`[GitHub] 文件不存在，新建模式`);
                     }
 
-                    // 步骤 2: 准备内容
                     let encodedContent;
+                    
                     if (isBinary) {
+                        // 图片：已经是 base64，清理空白即可
                         encodedContent = content.replace(/\s/g, '');
                     } else {
-                        const bytes = new TextEncoder().encode(content);
-                        const binary = Array.from(bytes, b => String.fromCharCode(b)).join('');
-                        encodedContent = btoa(binary);
+                        // 【关键修复】正确编码 UTF-8 文本（支持中文）
+                        // 步骤1: 使用 TextEncoder 将 UTF-8 字符串转换为 Uint8Array
+                        const utf8Bytes = new TextEncoder().encode(content);
+                        
+                        // 步骤2: 将字节数组转换为二进制字符串（用于 btoa）
+                        const binaryString = Array.from(utf8Bytes, byte => String.fromCharCode(byte)).join('');
+                        
+                        // 步骤3: Base64 编码
+                        encodedContent = btoa(binaryString);
                     }
 
-                    // 步骤 3: 构建请求体（关键：只有有 SHA 时才加）
                     const body = {
                         message: message,
                         content: encodedContent,
                         branch: this.config.branch
                     };
-                    
-                    if (sha) {
-                        body.sha = sha;  // 【关键】这行必须执行
-                    }
+                    if (sha) body.sha = sha;
 
-                    console.log(`[GitHub] PUT ${path} (${(encodedContent.length/1024).toFixed(1)}KB)，尝试 ${attempt}/${maxRetries}`);
-
-                    // 步骤 4: 发送请求
                     const response = await fetch(
                         `${this.getBaseUrl()}/contents/${this.config.dataPath}/${path}`,
                         {
@@ -135,24 +137,11 @@
                         }
                     );
 
-                    // 步骤 5: 处理 422（SHA 不匹配）
-                    if (response.status === 422) {
+                    if (response.status === 422 || response.status === 409) {
                         const err = await response.json().catch(() => ({}));
-                        console.error('[GitHub] 422 错误:', err.message || '未知');
-                        
-                        if (err.message && err.message.includes('sha')) {
-                            console.log('[GitHub] SHA 无效，等待后重试...');
-                            await new Promise(r => setTimeout(r, 2000 * attempt));
-                            continue; // 重试
-                        }
-                        throw new Error(`422: ${err.message}`);
-                    }
-
-                    // 步骤 6: 处理 409（冲突）
-                    if (response.status === 409) {
-                        console.log('[GitHub] 409 冲突，等待后重试...');
-                        await new Promise(r => setTimeout(r, 3000));
-                        continue; // 重试
+                        console.warn(`[GitHub] ${response.status}: ${err.message}，等待后重试...`);
+                        await new Promise(r => setTimeout(r, 2000 * attempt));
+                        continue;
                     }
 
                     if (!response.ok) {
@@ -163,11 +152,8 @@
                     return await response.json();
                     
                 } catch (error) {
-                    if (attempt >= maxRetries) {
-                        console.error(`[GitHub] 最终失败: ${error.message}`);
-                        throw error;
-                    }
-                    console.warn(`[GitHub] 尝试 ${attempt} 失败，重试...`);
+                    console.error(`[GitHub] 尝试 ${attempt} 失败:`, error.message);
+                    if (attempt >= retryCount) throw error;
                     await new Promise(r => setTimeout(r, 1000 * attempt));
                 }
             }
