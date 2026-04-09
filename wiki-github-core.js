@@ -1747,7 +1747,7 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
     const isResuming = resumeFromShard > 0;
     
     const progress = this.showProgressDialog(
-        isResuming ? `继续导入（从第 ${resumeFromShard} 批开始）` : '正在导入存档'
+        isResuming ? `继续导入（从第 ${resumeFromShard} 批开始）` : ''
     );
     
     try {
@@ -2546,6 +2546,66 @@ showImportModeDialog: function() {
             this.showToast('已复制到剪贴板', 'success');
         });
     },
+    // 【新增】修复图片引用并重新上传丢失的图片
+    async fixAndReloadImages() {
+        const progress = this.showProgressDialog('修复图片引用...');
+        let fixedCount = 0;
+        let missingCount = 0;
+        
+        try {
+            // 获取 GitHub 上实际存在的图片列表
+            progress.update(10, '获取远程图片列表...');
+            const remoteImages = await this.githubStorage.getImageList();
+            const remoteSet = new Set(remoteImages);
+            
+            progress.update(30, '检查条目图片引用...');
+            
+            for (const entry of this.data.entries) {
+                if (!entry.versions) continue;
+                
+                for (const version of entry.versions) {
+                    if (!version.images) continue;
+                    
+                    for (const [key, value] of Object.entries(version.images)) {
+                        if (!value || !value.startsWith('{{IMG:')) continue;
+                        
+                        const filename = value.slice(6, -2);
+                        
+                        // 检查图片是否存在于 GitHub
+                        if (!remoteSet.has(filename)) {
+                            console.warn(`[FixImage] 缺失: ${filename}`);
+                            missingCount++;
+                            // 清空引用（标记为缺失）
+                            version.images[key] = null;
+                        } else {
+                            fixedCount++;
+                        }
+                    }
+                }
+            }
+            
+            progress.update(80, '保存修复后的数据...');
+            await this.saveData();
+            
+            progress.update(100, `完成！修复 ${fixedCount} 张，缺失 ${missingCount} 张`);
+            setTimeout(() => progress.close(), 1000);
+            
+            if (missingCount > 0) {
+                this.showAlertDialog({
+                    title: '图片修复报告',
+                    message: `${missingCount} 张图片在仓库中不存在，已清除引用。\n请重新导入包含图片的ZIP文件。`,
+                    type: 'warning'
+                });
+            }
+            
+        } catch (e) {
+            progress.close();
+            console.error('[FixImage] 失败:', e);
+        }
+    },
+
+// 【新增】在设置页面添加"修复图片"按钮的调用
+// 在 renderSettings 中添加一个按钮调用此方法
 
     // ========== 数据导出 ==========
     exportData() {
