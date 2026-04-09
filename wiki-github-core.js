@@ -2065,21 +2065,8 @@ showProgressDialog: function(title = '处理中') {
                 setTimeout(() => el.remove(), 300);
             }
         },
-        // 【新增】show 方法，用于重新显示（如果之前只是隐藏）
         show: () => {
-            const el = document.getElementById('global-progress-overlay');
-            if (el) {
-                el.style.display = 'flex';
-                el.style.opacity = '1';
-            }
-        },
-        // 【新增】hide 方法，用于临时隐藏（不删除元素）
-        hide: () => {
-            const el = document.getElementById('global-progress-overlay');
-            if (el) {
-                el.style.opacity = '0';
-                setTimeout(() => { if(el.style.opacity === '0') el.style.display = 'none'; }, 300);
-            }
+            overlay.style.opacity = '1';
         }
     };
 },
@@ -3086,6 +3073,63 @@ showImportModeDialog: function() {
     // ========== 版本管理器（占位）==========
     showVersionManager() {
         this.showToast('版本管理器功能开发中', 'info');
+    },
+
+    // 【新增】进度条弹窗系统
+    // 替换 showProgressDialog 方法（添加 show 方法）
+
+    showProgressDialog: function(title = '处理中') {
+        const overlay = document.createElement('div');
+        overlay.id = 'global-progress-overlay';
+        overlay.className = 'fixed inset-0 bg-black/60 z-[100000] flex items-center justify-center p-4';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                <h3 id="progress-title" class="text-lg font-bold text-gray-800 mb-4">${title}</h3>
+                <div class="w-full bg-gray-200 rounded-full h-3 mb-3 overflow-hidden">
+                    <div id="progress-bar" class="bg-indigo-600 h-3 rounded-full transition-all duration-300 ease-out" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between items-center">
+                    <span id="progress-text" class="text-sm text-gray-600">准备中...</span>
+                    <span id="progress-percent" class="text-sm font-bold text-indigo-600">0%</span>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        
+        return {
+            update: (percent, text) => {
+                const bar = document.getElementById('progress-bar');
+                const percentText = document.getElementById('progress-percent');
+                const descText = document.getElementById('progress-text');
+                if (bar) bar.style.width = Math.max(0, Math.min(100, percent)) + '%';
+                if (percentText) percentText.textContent = Math.round(percent) + '%';
+                if (descText && text) descText.textContent = text;
+            },
+            close: () => {
+                const el = document.getElementById('global-progress-overlay');
+                if (el) {
+                    el.style.opacity = '0';
+                    el.style.transition = 'opacity 0.3s';
+                    setTimeout(() => el.remove(), 300);
+                }
+            },
+            // 【新增】show 方法，用于重新显示（如果之前只是隐藏）
+            show: () => {
+                const el = document.getElementById('global-progress-overlay');
+                if (el) {
+                    el.style.display = 'flex';
+                    el.style.opacity = '1';
+                }
+            },
+            // 【新增】hide 方法，用于临时隐藏（不删除元素）
+            hide: () => {
+                const el = document.getElementById('global-progress-overlay');
+                if (el) {
+                    el.style.opacity = '0';
+                    setTimeout(() => { if(el.style.opacity === '0') el.style.display = 'none'; }, 300);
+                }
+            }
+        };
     },
 
     // 【替换】saveData 方法 - 实现分片保存
