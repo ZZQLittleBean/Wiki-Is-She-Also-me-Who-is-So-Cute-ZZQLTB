@@ -64,19 +64,34 @@
                 });
 
                 if (!response.ok) {
-                    if (response.status === 404) return null;
+                    if (response.status === 404) {
+                        console.log(`[GitHub] 文件 ${path} 不存在（404）`);
+                        return null;
+                    }
                     throw new Error(`GitHub API错误: ${response.status}`);
                 }
 
                 const data = await response.json();
-                // 【修复】检查 content 是否存在且不为空
-                if (!data.content || data.content.trim() === '') {
-                    console.warn(`[GitHub] 文件 ${path} 内容为空`);
+                
+                // 【修复】更精确的空内容检测
+                if (!data.content) {
+                    console.warn(`[GitHub] 文件 ${path} 无 content 字段`);
                     return null;
                 }
                 
-                const content = atob(data.content.replace(/\s/g, ''));
-                return { content, sha: data.sha };
+                if (data.content.trim() === '') {
+                    console.warn(`[GitHub] 文件 ${path} content 为空字符串`);
+                    return null;
+                }
+                
+                try {
+                    const content = atob(data.content.replace(/\s/g, ''));
+                    console.log(`[GitHub] 成功读取 ${path}，内容长度: ${content.length}`);
+                    return { content, sha: data.sha };
+                } catch (decodeError) {
+                    console.error(`[GitHub] Base64 解码 ${path} 失败:`, decodeError);
+                    return null;
+                }
             } catch (error) {
                 console.error('[GitHub] 获取文件失败:', error);
                 throw error;
