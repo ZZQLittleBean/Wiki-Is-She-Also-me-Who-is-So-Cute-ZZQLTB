@@ -1328,7 +1328,7 @@ Object.assign(window.app, {
     },
 
     // ========== 数据导入 ==========
-    async handleImportFolder(input) {
+        async handleImportFolder(input) {
         const files = input.files;
         if (!files || files.length === 0) {
             this.showImportStatus('请选择文件夹', 'error');
@@ -1337,19 +1337,20 @@ Object.assign(window.app, {
 
         this.showImportStatus('正在读取文件...', 'info');
 
-        // 查找数据文件（支持 data.json 或 wiki-manifest.json）
-        let dataFile = null;
+        // 使用对象存储候选文件，避免重复声明
+        const candidates = {
+            dataJson: null,
+            manifest: null
+        };
         const imageFiles = [];
-        let manifestFile = null;
 
         for (const file of files) {
             const path = file.webkitRelativePath || file.name;
             
-            // 分离判断逻辑，data.json 优先级高于 wiki-manifest.json
             if (path.endsWith('data.json') && !path.includes('/wiki-images/')) {
-                dataFile = file;  // 直接赋值给已存在的 dataFile
+                candidates.dataJson = file;
             } else if (path.endsWith('wiki-manifest.json') && !path.includes('/wiki-images/')) {
-                manifestFile = file;  // 先存到临时变量，不直接给 dataFile
+                candidates.manifest = file;
             }
             
             if (path.includes('/wiki-images/') && file.type.startsWith('image/')) {
@@ -1357,46 +1358,32 @@ Object.assign(window.app, {
             }
         }
 
-        // 如果找到了 data.json，就用 data.json；否则退而求其次用 manifest
-        if (!dataFile && manifestFile) {
-            dataFile = manifestFile;
-        }
+        // 确定使用哪个数据文件（data.json 优先）
+        const dataFile = candidates.dataJson || candidates.manifest;
 
         if (!dataFile) {
             this.showImportStatus('未找到数据文件（data.json），请确保选择了正确的文件夹', 'error');
             return;
         }
 
-        if (!dataFile) {
-            this.showImportStatus('未找到数据文件（data.json 或 wiki-manifest.json），请确保选择了正确的"Wiki数据"文件夹', 'error');
-            return;
-        }
-
         try {
             const dataText = await dataFile.text();
             const importedData = JSON.parse(dataText);
-            // 新增：检测是否错误地加载了 wiki-manifest.json
-            if (importedData.mappings && !importedData.entries) {
-                this.showImportStatus('错误：选中了 wiki-manifest.json（资源映射文件），请选择 data.json 作为数据文件', 'error');
+
+            if (importedData.mappings && !importedData.entries && !importedData.data) {
+                this.showImportStatus('错误：选中了 wiki-manifest.json（资源映射文件），请选择包含 data.json 的文件夹', 'error');
                 return;
             }
 
-            // 原有检查保持不变，但增加对 data 字段的支持（如果将来使用嵌套结构）
             if (!importedData.entries && !importedData.data?.entries) {
-                this.showImportStatus('数据格式不正确：缺少 entries 数组，请确保选择了正确的 data.json 文件', 'error');
+                this.showImportStatus('数据格式不正确：缺少 entries 数组', 'error');
                 return;
             }
 
-            // 处理不同格式的数据
+            this.showImportStatus(`找到 ${importedData.entries?.length || importedData.data?.entries?.length || 0} 个词条，${imageFiles.length} 张图片，正在导入...`, 'info');
+
+            // 数据合并逻辑（与 ZIP 导入保持一致）
             const entries = importedData.entries || importedData.data?.entries || [];
-            const chapters = importedData.chapters || importedData.data?.chapters || [];
-            const camps = importedData.camps || importedData.data?.camps || [];
-            const synopsis = importedData.synopsis || importedData.data?.synopsis || [];
-            const announcements = importedData.announcements || importedData.data?.announcements || [];
-
-            this.showImportStatus(`找到 ${entries.length} 个词条，${imageFiles.length} 张图片，正在导入...`, 'info');
-
-            // 合并数据
             const existingIds = new Set(this.data.entries.map(e => e.id));
             let addedCount = 0;
             let skippedCount = 0;
@@ -1410,44 +1397,30 @@ Object.assign(window.app, {
                 }
             }
 
-            // 合并章节
-            const existingChapterIds = new Set(this.data.chapters.map(c => c.id));
-            for (const chapter of chapters) {
-                if (!existingChapterIds.has(chapter.id)) {
-                    this.data.chapters.push(chapter);
-                }
-            }
+            const mergeArray = (target, source, key = 'id') => {
+                if (!source) return;
+                const existing = new Set(target.map(i => i[key]));
+                source.forEach(item => {
+                    if (!existing.has(item[key])) target.push(item);
+                });
+            };
 
-            // 合并阵营
-            for (const camp of camps) {
-                if (!this.data.camps.includes(camp)) {
-                    this.data.camps.push(camp);
-                }
-            }
+            mergeArray(this.data.chapters, importedData.chapters || importedData.data?.chapters);
+            mergeArray(this.data.synopsis, importedData.synopsis || importedData.data?.synopsis);
+            mergeArray(this.data.announcements, importedData.announcements || importedData.data?.announcements);
 
-            // 合并剧情梗概
-            const existingSynopsisIds = new Set(this.data.synopsis.map(s => s.id));
-            for (const syn of synopsis) {
-                if (!existingSynopsisIds.has(syn.id)) {
-                    this.data.synopsis.push(syn);
-                }
-            }
+            (importedData.camps || importedData.data?.camps || []).forEach(camp => {
+                if (!this.data.camps.includes(camp)) this.data.camps.push(camp);
+            });
 
-            // 合并公告
-            const existingAnnIds = new Set(this.data.announcements.map(a => a.id));
-            for (const ann of announcements) {
-                if (!existingAnnIds.has(ann.id)) {
-                    this.data.announcements.push(ann);
-                }
+            if (importedData.settings) {
+                this.data.settings = { ...this.data.settings, ...importedData.settings };
             }
-
-            // 导入标题和副标题
             if (importedData.wikiTitle) this.data.wikiTitle = importedData.wikiTitle;
             if (importedData.wikiSubtitle) this.data.wikiSubtitle = importedData.wikiSubtitle;
 
-            // 上传图片到 GitHub
             let uploadedImages = 0;
-            if (imageFiles.length > 0) {
+            if (imageFiles.length > 0 && this.githubStorage) {
                 for (const imgFile of imageFiles) {
                     try {
                         const reader = new FileReader();
@@ -1456,7 +1429,6 @@ Object.assign(window.app, {
                             reader.onerror = reject;
                             reader.readAsDataURL(imgFile);
                         });
-
                         await this.githubStorage.saveImage(imgFile.name, dataUrl);
                         uploadedImages++;
                     } catch (e) {
@@ -1465,7 +1437,6 @@ Object.assign(window.app, {
                 }
             }
 
-            // 保存到 GitHub
             await this.githubStorage.saveWikiData(this.data);
 
             this.showImportStatus(
@@ -1482,6 +1453,342 @@ Object.assign(window.app, {
         }
 
         input.value = '';
+    },
+        // 处理ZIP文件选择
+    handleZipFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        if (!file.name.endsWith('.zip')) {
+            this.showAlertDialog({
+                title: '格式错误',
+                message: '请选择 .zip 格式的文件',
+                type: 'warning'
+            });
+            return;
+        }
+        
+        this.importZipFile(file);
+        input.value = ''; // 重置以便重复选择
+    },
+    
+    // ZIP文件导入（完整版）
+    async importZipFile(zipFile) {
+        if (!window.JSZip) {
+            this.showAlertDialog({
+                title: '缺少依赖',
+                message: 'JSZip 库未加载，无法解析ZIP文件',
+                type: 'error'
+            });
+            return;
+        }
+
+        try {
+            this.showToast('正在解析ZIP文件...', 'info');
+            const zip = await window.JSZip.loadAsync(zipFile);
+            
+            // 1. 读取 data.json（必需）
+            const dataFile = zip.file('data.json');
+            if (!dataFile) {
+                throw new Error('ZIP中缺少 data.json 文件');
+            }
+            
+            const dataText = await dataFile.async('string');
+            const importedData = JSON.parse(dataText);
+            
+            // 验证数据结构
+            if (!importedData.entries && !importedData.data?.entries) {
+                throw new Error('数据格式不正确：缺少 entries 数组');
+            }
+            
+            // 2. 处理图片
+            const imageFiles = Object.keys(zip.files).filter(name => 
+                name.startsWith('images/') && 
+                !zip.files[name].dir &&
+                (name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg'))
+            );
+            
+            console.log(`[Import] ZIP中包含 ${imageFiles.length} 张图片`);
+            
+            let uploadedImages = 0;
+            const failedImages = [];
+            
+            for (const imgPath of imageFiles) {
+                const filename = imgPath.replace('images/', '');
+                try {
+                    const arrayBuffer = await zip.file(imgPath).async('arraybuffer');
+                    const blob = new Blob([arrayBuffer]);
+                    
+                    const dataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(blob);
+                    });
+                    
+                    await this.githubStorage.saveImage(filename, dataUrl);
+                    uploadedImages++;
+                } catch (e) {
+                    console.error(`[Import] 处理图片失败 ${filename}:`, e);
+                    failedImages.push(filename);
+                }
+            }
+            
+            // 3. 合并数据
+            const entries = importedData.entries || importedData.data?.entries || [];
+            const existingIds = new Set(this.data.entries.map(e => e.id));
+            let addedCount = 0;
+            let skipCount = 0;
+            
+            for (const entry of entries) {
+                if (!existingIds.has(entry.id)) {
+                    this.data.entries.push(entry);
+                    addedCount++;
+                } else {
+                    skipCount++;
+                }
+            }
+            
+            // 合并其他数据（chapters, camps, synopsis, announcements）
+            const mergeArray = (target, source, key = 'id') => {
+                const existing = new Set(target.map(i => i[key]));
+                (source || []).forEach(item => {
+                    if (!existing.has(item[key])) target.push(item);
+                });
+            };
+            
+            mergeArray(this.data.chapters, importedData.chapters || importedData.data?.chapters);
+            mergeArray(this.data.synopsis, importedData.synopsis || importedData.data?.synopsis);
+            mergeArray(this.data.announcements, importedData.announcements || importedData.data?.announcements);
+            
+            (importedData.camps || importedData.data?.camps || []).forEach(camp => {
+                if (!this.data.camps.includes(camp)) this.data.camps.push(camp);
+            });
+            
+            if (importedData.settings) {
+                this.data.settings = { ...this.data.settings, ...importedData.settings };
+            }
+            
+            // 4. 保存到 GitHub
+            await this.saveData();
+            
+            const msg = [
+                `导入成功！`,
+                `新增 ${addedCount} 个词条${skipCount > 0 ? `（跳过 ${skipCount} 个重复）` : ''}`,
+                `上传 ${uploadedImages}/${imageFiles.length} 张图片`,
+                failedImages.length > 0 ? `失败 ${failedImages.length} 张: ${failedImages.join(', ')}` : ''
+            ].filter(Boolean).join('\n');
+            
+            this.showAlertDialog({
+                title: '导入完成',
+                message: msg,
+                type: 'success'
+            });
+            
+            this.updateUIForMode();
+            
+        } catch (error) {
+            console.error('[Import] ZIP导入失败:', error);
+            this.showAlertDialog({
+                title: '导入失败',
+                message: error.message || '无法解析ZIP文件',
+                type: 'error'
+            });
+        }
+    },
+        // ========== ZIP 文件导入（新增/恢复）==========
+    
+    async importZipFile(zipFile) {
+        if (!window.JSZip) {
+            this.showAlertDialog({
+                title: '缺少依赖',
+                message: 'JSZip 库未加载，无法解析ZIP文件',
+                type: 'error'
+            });
+            return;
+        }
+
+        try {
+            this.showToast('正在解析ZIP文件...', 'info');
+            const zip = await window.JSZip.loadAsync(zipFile);
+            
+            // 1. 读取 data.json（必需）
+            const dataFile = zip.file('data.json');
+            if (!dataFile) {
+                throw new Error('ZIP中缺少 data.json 文件');
+            }
+            
+            const dataText = await dataFile.async('string');
+            const importedData = JSON.parse(dataText);
+            
+            // 验证数据结构
+            if (!importedData.entries && !importedData.data?.entries) {
+                throw new Error('数据格式不正确：缺少 entries 数组');
+            }
+            
+            // 2. 尝试读取 manifest（可选，用于验证）
+            const manifestFile = zip.file('wiki-manifest.json');
+            let pkgManifest = null;
+            if (manifestFile) {
+                try {
+                    const manifestText = await manifestFile.async('string');
+                    pkgManifest = JSON.parse(manifestText);
+                    console.log('[Import] 读取到包内 manifest:', pkgManifest);
+                } catch (e) {
+                    console.warn('[Import] 读取 manifest 失败:', e);
+                }
+            }
+            
+            // 3. 处理图片（关键步骤）
+            const imageFiles = Object.keys(zip.files).filter(name => 
+                name.startsWith('images/') && 
+                !zip.files[name].dir &&
+                (name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg'))
+            );
+            
+            console.log(`[Import] ZIP中包含 ${imageFiles.length} 张图片`);
+            
+            let uploadedImages = 0;
+            const failedImages = [];
+            
+            // 处理每张图片并上传到 GitHub
+            for (const imgPath of imageFiles) {
+                const filename = imgPath.replace('images/', '');
+                try {
+                    // 获取图片二进制数据
+                    const arrayBuffer = await zip.file(imgPath).async('arraybuffer');
+                    const blob = new Blob([arrayBuffer]);
+                    
+                    // 转换为 DataURL 用于内存缓存
+                    const dataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.readAsDataURL(blob);
+                    });
+                    
+                    // 上传到 GitHub（关键差异：本地版存OPFS，GitHub版需上传到仓库）
+                    if (this.githubStorage && this.githubStorage.saveImage) {
+                        await this.githubStorage.saveImage(filename, dataUrl);
+                        uploadedImages++;
+                    } else {
+                        // 如果没有GitHub存储，仅缓存到内存（前台模式）
+                        if (!this.imageCache) this.imageCache = new Map();
+                        this.imageCache.set(filename, dataUrl);
+                        uploadedImages++;
+                    }
+                    
+                } catch (e) {
+                    console.error(`[Import] 处理图片失败 ${filename}:`, e);
+                    failedImages.push(filename);
+                }
+            }
+            
+            // 4. 合并数据到当前数据集
+            const entries = importedData.entries || importedData.data?.entries || [];
+            const chapters = importedData.chapters || importedData.data?.chapters || [];
+            const camps = importedData.camps || importedData.data?.camps || [];
+            const synopsis = importedData.synopsis || importedData.data?.synopsis || [];
+            const announcements = importedData.announcements || importedData.data?.announcements || [];
+            
+            // 合并 entries（去重）
+            const existingIds = new Set(this.data.entries.map(e => e.id));
+            let addedCount = 0;
+            let skipCount = 0;
+            
+            for (const entry of entries) {
+                if (!existingIds.has(entry.id)) {
+                    this.data.entries.push(entry);
+                    addedCount++;
+                } else {
+                    // 可选：更新已存在的条目（这里选择跳过）
+                    skipCount++;
+                }
+            }
+            
+            // 合并 chapters（去重）
+            const existingChIds = new Set(this.data.chapters.map(c => c.id));
+            for (const chapter of chapters) {
+                if (!existingChIds.has(chapter.id)) {
+                    this.data.chapters.push(chapter);
+                }
+            }
+            
+            // 合并 camps（去重）
+            for (const camp of camps) {
+                if (!this.data.camps.includes(camp)) {
+                    this.data.camps.push(camp);
+                }
+            }
+            
+            // 合并 synopsis（去重）
+            const existingSynIds = new Set(this.data.synopsis.map(s => s.id));
+            for (const syn of synopsis) {
+                if (!existingSynIds.has(syn.id)) {
+                    this.data.synopsis.push(syn);
+                }
+            }
+            
+            // 合并 announcements（去重）
+            const existingAnnIds = new Set(this.data.announcements.map(a => a.id));
+            for (const ann of announcements) {
+                if (!existingAnnIds.has(ann.id)) {
+                    this.data.announcements.push(ann);
+                }
+            }
+            
+            // 更新 settings（如果存在）
+            if (importedData.settings) {
+                this.data.settings = { ...this.data.settings, ...importedData.settings };
+            }
+            if (importedData.wikiTitle) this.data.wikiTitle = importedData.wikiTitle;
+            if (importedData.wikiSubtitle) this.data.wikiSubtitle = importedData.wikiSubtitle;
+            
+            // 5. 保存到 GitHub
+            await this.saveData();
+            
+            // 6. 显示结果
+            const msg = [
+                `导入成功！`,
+                `新增 ${addedCount} 个词条${skipCount > 0 ? `（跳过 ${skipCount} 个重复）` : ''}`,
+                `上传 ${uploadedImages}/${imageFiles.length} 张图片`,
+                failedImages.length > 0 ? `失败 ${failedImages.length} 张` : ''
+            ].filter(Boolean).join('\n');
+            
+            this.showAlertDialog({
+                title: '导入完成',
+                message: msg,
+                type: 'success'
+            });
+            
+            // 刷新页面数据
+            this.updateUIForMode();
+            if (this.router) this.router('home');
+            
+        } catch (error) {
+            console.error('[Import] ZIP导入失败:', error);
+            this.showAlertDialog({
+                title: '导入失败',
+                message: error.message || '无法解析ZIP文件',
+                type: 'error'
+            });
+        }
+    },
+    
+    // 处理ZIP文件选择（绑定到文件输入）
+    handleZipFileSelect(input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        if (!file.name.endsWith('.zip')) {
+            this.showAlertDialog({
+                title: '格式错误',
+                message: '请选择 .zip 格式的文件',
+                type: 'warning'
+            });
+            return;
+        }
+        
+        this.importZipFile(file);
+        input.value = ''; // 重置以便重复选择
     },
 
     showImportStatus(message, type) {

@@ -598,8 +598,10 @@
                     <div class="space-y-3">
                         <p class="text-xs text-gray-500">
                             <i class="fa-solid fa-info-circle mr-1"></i>
-                            选择"Wiki数据"文件夹（包含 data.json/wiki-manifest.json 和 wiki-images 文件夹）
+                            支持两种方式：文件夹导入（适合开发）或 ZIP 导入（适合备份恢复）
                         </p>
+                        
+                        <!-- 文件夹导入 -->
                         <input type="file" id="import-folder" webkitdirectory directory multiple 
                             class="hidden" onchange="app.handleImportFolder(this)">
                         <button onclick="document.getElementById('import-folder').click()" 
@@ -607,6 +609,16 @@
                             <i class="fa-solid fa-folder-open"></i>
                             选择Wiki数据文件夹
                         </button>
+                        
+                        <!-- ZIP 文件导入（新增） -->
+                        <input type="file" id="import-zip" accept=".zip" 
+                            class="hidden" onchange="app.handleZipFileSelect(this)">
+                        <button onclick="document.getElementById('import-zip').click()" 
+                            class="w-full py-2 bg-blue-50 text-blue-600 rounded-lg text-sm hover:bg-blue-100 transition flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-file-zipper"></i>
+                            导入ZIP备份文件
+                        </button>
+                        
                         <div id="import-status" class="hidden text-xs text-center py-2 rounded-lg"></div>
                     </div>
                 </div>
