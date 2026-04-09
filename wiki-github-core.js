@@ -1467,9 +1467,9 @@ Object.assign(window.app, {
             });
             return;
         }
-        
-        this.importZipFile(file);
-        input.value = ''; // 重置以便重复选择
+        // 修改为调用新的带模式选择的导入
+        this.importZipFile(file, 'ask'); // 'ask' 会弹出模式选择框
+        input.value = '';
     },
     
     // ZIP文件导入（完整版）
@@ -1597,172 +1597,167 @@ Object.assign(window.app, {
     },
         // ========== ZIP 文件导入（新增/恢复）==========
     
-    async importZipFile(zipFile) {
-        if (!window.JSZip) {
-            this.showAlertDialog({
-                title: '缺少依赖',
-                message: 'JSZip 库未加载，无法解析ZIP文件',
-                type: 'error'
-            });
-            return;
+    // 在 importZipFile 函数开头添加模式选择
+    async importZipFile(zipFile, mode = 'ask') {
+        // mode: 'merge' (合并), 'replace' (覆盖), 'ask' (询问)
+        
+        if (mode === 'ask') {
+            const userChoice = await this.showImportModeDialog();
+            if (userChoice === 'cancel') return;
+            mode = userChoice; // 'merge' 或 'replace'
         }
 
         try {
             this.showToast('正在解析ZIP文件...', 'info');
             const zip = await window.JSZip.loadAsync(zipFile);
             
-            // 1. 读取 data.json（必需）
+            // 1. 读取 data.json
             const dataFile = zip.file('data.json');
-            if (!dataFile) {
-                throw new Error('ZIP中缺少 data.json 文件');
-            }
-            
-            const dataText = await dataFile.async('string');
-            const importedData = JSON.parse(dataText);
+            if (!dataFile) throw new Error('ZIP中缺少 data.json 文件');
+            const importedData = JSON.parse(await dataFile.async('string'));
             
             // 验证数据结构
             if (!importedData.entries && !importedData.data?.entries) {
                 throw new Error('数据格式不正确：缺少 entries 数组');
             }
-            
-            // 2. 尝试读取 manifest（可选，用于验证）
-            const manifestFile = zip.file('wiki-manifest.json');
-            let pkgManifest = null;
-            if (manifestFile) {
-                try {
-                    const manifestText = await manifestFile.async('string');
-                    pkgManifest = JSON.parse(manifestText);
-                    console.log('[Import] 读取到包内 manifest:', pkgManifest);
-                } catch (e) {
-                    console.warn('[Import] 读取 manifest 失败:', e);
-                }
+
+            // 【关键修复】如果是覆盖模式，先清空现有数据
+            if (mode === 'replace') {
+                this.data = {
+                    entries: [],
+                    chapters: [],
+                    camps: [],
+                    synopsis: [],
+                    announcements: [],
+                    homeContent: [],
+                    customFields: {},
+                    currentTimeline: 'latest',
+                    currentMode: 'view',
+                    wikiTitle: '未命名 Wiki',
+                    wikiSubtitle: '',
+                    fontFamily: "'Noto Sans SC', sans-serif",
+                    // 保留登录状态和配置
+                    ...this.getSystemConfig()
+                };
+                this.showToast('已清空现有数据，准备导入...', 'info');
             }
-            
-            // 3. 处理图片（关键步骤）
+
+            // 2. 处理图片（保持原有逻辑）
             const imageFiles = Object.keys(zip.files).filter(name => 
                 name.startsWith('images/') && 
                 !zip.files[name].dir &&
                 (name.endsWith('.jpg') || name.endsWith('.png') || name.endsWith('.jpeg'))
             );
             
-            console.log(`[Import] ZIP中包含 ${imageFiles.length} 张图片`);
-            
             let uploadedImages = 0;
-            const failedImages = [];
-            
-            // 处理每张图片并上传到 GitHub
             for (const imgPath of imageFiles) {
                 const filename = imgPath.replace('images/', '');
                 try {
-                    // 获取图片二进制数据
                     const arrayBuffer = await zip.file(imgPath).async('arraybuffer');
                     const blob = new Blob([arrayBuffer]);
-                    
-                    // 转换为 DataURL 用于内存缓存
                     const dataUrl = await new Promise((resolve) => {
                         const reader = new FileReader();
                         reader.onload = (e) => resolve(e.target.result);
                         reader.readAsDataURL(blob);
                     });
-                    
-                    // 上传到 GitHub（关键差异：本地版存OPFS，GitHub版需上传到仓库）
-                    if (this.githubStorage && this.githubStorage.saveImage) {
-                        await this.githubStorage.saveImage(filename, dataUrl);
-                        uploadedImages++;
-                    } else {
-                        // 如果没有GitHub存储，仅缓存到内存（前台模式）
-                        if (!this.imageCache) this.imageCache = new Map();
-                        this.imageCache.set(filename, dataUrl);
-                        uploadedImages++;
-                    }
-                    
+                    await this.githubStorage.saveImage(filename, dataUrl);
+                    uploadedImages++;
                 } catch (e) {
-                    console.error(`[Import] 处理图片失败 ${filename}:`, e);
-                    failedImages.push(filename);
+                    console.warn(`[Import] 处理图片失败 ${filename}:`, e);
                 }
             }
-            
-            // 4. 合并数据到当前数据集
+
+            // 3. 【关键修复】智能合并/覆盖数据
             const entries = importedData.entries || importedData.data?.entries || [];
             const chapters = importedData.chapters || importedData.data?.chapters || [];
             const camps = importedData.camps || importedData.data?.camps || [];
             const synopsis = importedData.synopsis || importedData.data?.synopsis || [];
             const announcements = importedData.announcements || importedData.data?.announcements || [];
-            
-            // 合并 entries（去重）
-            const existingIds = new Set(this.data.entries.map(e => e.id));
-            let addedCount = 0;
-            let skipCount = 0;
-            
-            for (const entry of entries) {
-                if (!existingIds.has(entry.id)) {
-                    this.data.entries.push(entry);
-                    addedCount++;
+            const homeContent = importedData.homeContent || importedData.data?.homeContent || [];
+            const customFields = importedData.customFields || importedData.data?.customFields || {};
+            const settings = importedData.settings || (importedData.data ? {
+                name: importedData.wikiTitle,
+                subtitle: importedData.wikiSubtitle,
+                customFont: importedData.fontFamily
+            } : {});
+
+            // Entries 处理：覆盖模式下直接替换，合并模式下智能更新
+            if (mode === 'replace') {
+                this.data.entries = entries;
+            } else {
+                // 合并模式：更新已存在的，添加新的
+                const existingMap = new Map(this.data.entries.map(e => [e.id, e]));
+                let updatedCount = 0;
+                let addedCount = 0;
+                
+                for (const entry of entries) {
+                    if (existingMap.has(entry.id)) {
+                        // 更新现有条目
+                        const idx = this.data.entries.findIndex(e => e.id === entry.id);
+                        if (idx !== -1) {
+                            this.data.entries[idx] = entry;
+                            updatedCount++;
+                        }
+                    } else {
+                        this.data.entries.push(entry);
+                        addedCount++;
+                    }
+                }
+                this.showToast(`更新 ${updatedCount} 个词条，新增 ${addedCount} 个`, 'success');
+            }
+
+            // 【关键修复】确保所有数组字段都被处理（不再使用简单的 mergeArray）
+            this.mergeOrReplaceArray('chapters', chapters, mode);
+            this.mergeOrReplaceArray('camps', camps, mode, true); // true 表示去重
+            this.mergeOrReplaceArray('synopsis', synopsis, mode);
+            this.mergeOrReplaceArray('announcements', announcements, mode);
+            this.mergeOrReplaceArray('homeContent', homeContent, mode);
+
+            // 【关键修复】处理自定义字段（对象合并）
+            if (mode === 'replace') {
+                this.data.customFields = customFields;
+            } else {
+                this.data.customFields = { ...this.data.customFields, ...customFields };
+            }
+
+            // 【关键修复】处理设置（合并或覆盖）
+            if (settings) {
+                if (mode === 'replace') {
+                    this.data.wikiTitle = settings.name || importedData.wikiTitle || '未命名 Wiki';
+                    this.data.wikiSubtitle = settings.subtitle || importedData.wikiSubtitle || '';
+                    this.data.fontFamily = settings.customFont || importedData.fontFamily || "'Noto Sans SC', sans-serif";
                 } else {
-                    // 可选：更新已存在的条目（这里选择跳过）
-                    skipCount++;
+                    // 合并模式：仅当新值存在且不为空时更新
+                    if (settings.name || importedData.wikiTitle) {
+                        this.data.wikiTitle = settings.name || importedData.wikiTitle || this.data.wikiTitle;
+                    }
+                    if (settings.subtitle !== undefined || importedData.wikiSubtitle !== undefined) {
+                        this.data.wikiSubtitle = settings.subtitle ?? importedData.wikiSubtitle ?? this.data.wikiSubtitle;
+                    }
                 }
             }
-            
-            // 合并 chapters（去重）
-            const existingChIds = new Set(this.data.chapters.map(c => c.id));
-            for (const chapter of chapters) {
-                if (!existingChIds.has(chapter.id)) {
-                    this.data.chapters.push(chapter);
-                }
-            }
-            
-            // 合并 camps（去重）
-            for (const camp of camps) {
-                if (!this.data.camps.includes(camp)) {
-                    this.data.camps.push(camp);
-                }
-            }
-            
-            // 合并 synopsis（去重）
-            const existingSynIds = new Set(this.data.synopsis.map(s => s.id));
-            for (const syn of synopsis) {
-                if (!existingSynIds.has(syn.id)) {
-                    this.data.synopsis.push(syn);
-                }
-            }
-            
-            // 合并 announcements（去重）
-            const existingAnnIds = new Set(this.data.announcements.map(a => a.id));
-            for (const ann of announcements) {
-                if (!existingAnnIds.has(ann.id)) {
-                    this.data.announcements.push(ann);
-                }
-            }
-            
-            // 更新 settings（如果存在）
-            if (importedData.settings) {
-                this.data.settings = { ...this.data.settings, ...importedData.settings };
-            }
-            if (importedData.wikiTitle) this.data.wikiTitle = importedData.wikiTitle;
-            if (importedData.wikiSubtitle) this.data.wikiSubtitle = importedData.wikiSubtitle;
-            
-            // 5. 保存到 GitHub
+
+            // 4. 保存到 GitHub
             await this.saveData();
-            
-            // 6. 显示结果
+
+            // 5. 显示结果
             const msg = [
-                `导入成功！`,
-                `新增 ${addedCount} 个词条${skipCount > 0 ? `（跳过 ${skipCount} 个重复）` : ''}`,
-                `上传 ${uploadedImages}/${imageFiles.length} 张图片`,
-                failedImages.length > 0 ? `失败 ${failedImages.length} 张` : ''
-            ].filter(Boolean).join('\n');
+                `导入成功！模式：${mode === 'replace' ? '完全覆盖' : '智能合并'}`,
+                `词条：${this.data.entries.length} 个`,
+                `章节：${this.data.chapters.length} 个`,
+                `公告：${this.data.announcements.length} 个`,
+                `上传 ${uploadedImages}/${imageFiles.length} 张图片`
+            ].join('\n');
             
             this.showAlertDialog({
                 title: '导入完成',
                 message: msg,
                 type: 'success'
             });
-            
-            // 刷新页面数据
+
             this.updateUIForMode();
             if (this.router) this.router('home');
-            
+
         } catch (error) {
             console.error('[Import] ZIP导入失败:', error);
             this.showAlertDialog({
@@ -1771,6 +1766,113 @@ Object.assign(window.app, {
                 type: 'error'
             });
         }
+    },
+
+    // 【新增】辅助方法：合并或替换数组
+    mergeOrReplaceArray: function(fieldName, newItems, mode, unique = false) {
+        if (mode === 'replace') {
+            this.data[fieldName] = newItems || [];
+            return;
+        }
+        
+        // 合并模式
+        if (!newItems || newItems.length === 0) return;
+        
+        const existing = this.data[fieldName] || [];
+        const existingIds = new Set(existing.map(i => i.id || i));
+        
+        for (const item of newItems) {
+            const itemId = item.id || item;
+            if (!existingIds.has(itemId)) {
+                existing.push(item);
+                if (unique) existingIds.add(itemId); // 对于 camps 这种简单数组也要记录
+            } else if (!unique && item.id) {
+                // 对于对象数组，更新已存在的项
+                const idx = existing.findIndex(e => e.id === item.id);
+                if (idx !== -1) existing[idx] = item;
+            }
+        }
+        
+        this.data[fieldName] = existing;
+    },
+
+    // 【新增】获取系统配置（导入时保留）
+    getSystemConfig: function() {
+        return {
+            backendLoggedIn: this.backendLoggedIn,
+            backendPassword: this.backendPassword,
+            runMode: this.runMode,
+            githubStorage: this.githubStorage ? {
+                config: this.githubStorage.config
+            } : null
+        };
+    },
+
+    // 【新增】导入模式选择对话框
+    showImportModeDialog: function() {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'fixed inset-0 bg-black/60 z-[99999] flex items-center justify-center p-4 fade-in';
+            overlay.innerHTML = `
+                <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+                    <div class="text-center mb-6">
+                        <div class="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fa-solid fa-file-import text-indigo-600 text-2xl"></i>
+                        </div>
+                        <h3 class="text-xl font-bold text-gray-800 mb-2">选择导入模式</h3>
+                        <p class="text-gray-600 text-sm">检测到存档文件，请选择如何处理现有数据</p>
+                    </div>
+                    
+                    <div class="space-y-3 mb-6">
+                        <button id="mode-replace" class="w-full p-4 border-2 border-indigo-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition text-left group">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-rotate text-indigo-600 text-xl"></i>
+                                <div>
+                                    <div class="font-bold text-gray-800 group-hover:text-indigo-700">完全覆盖</div>
+                                    <div class="text-xs text-gray-500">清空现有数据，使用存档完全替换</div>
+                                </div>
+                            </div>
+                        </button>
+                        
+                        <button id="mode-merge" class="w-full p-4 border-2 border-gray-200 rounded-xl hover:border-indigo-500 hover:bg-indigo-50 transition text-left group">
+                            <div class="flex items-center gap-3">
+                                <i class="fa-solid fa-code-merge text-gray-600 text-xl group-hover:text-indigo-600"></i>
+                                <div>
+                                    <div class="font-bold text-gray-800 group-hover:text-indigo-700">智能合并</div>
+                                    <div class="text-xs text-gray-500">保留现有数据，更新相同ID的条目，添加新条目</div>
+                                </div>
+                            </div>
+                        </button>
+                    </div>
+                    
+                    <button id="mode-cancel" class="w-full py-2 text-gray-500 hover:text-gray-700 text-sm">
+                        取消导入
+                    </button>
+                </div>
+            `;
+            
+            document.body.appendChild(overlay);
+            
+            overlay.querySelector('#mode-replace').onclick = () => {
+                overlay.remove();
+                resolve('replace');
+            };
+            overlay.querySelector('#mode-merge').onclick = () => {
+                overlay.remove();
+                resolve('merge');
+            };
+            overlay.querySelector('#mode-cancel').onclick = () => {
+                overlay.remove();
+                resolve('cancel');
+            };
+            
+            overlay.onclick = (e) => {
+                if (e.target === overlay) {
+                    overlay.remove();
+                    resolve('cancel');
+                }
+            };
+        });
     },
     
     // 处理ZIP文件选择（绑定到文件输入）
@@ -1787,8 +1889,9 @@ Object.assign(window.app, {
             return;
         }
         
-        this.importZipFile(file);
-        input.value = ''; // 重置以便重复选择
+        // 修改为调用新的带模式选择的导入
+        this.importZipFile(file, 'ask'); // 'ask' 会弹出模式选择框
+        input.value = '';
     },
 
     showImportStatus(message, type) {
@@ -1913,9 +2016,36 @@ Object.assign(window.app, {
             this.showToast('ZIP库未加载', 'error');
             return;
         }
+        // 【修复】确保导出时包含所有字段，包括 homeContent 和 customFields
+        const exportData = {
+            // 基础字段
+            entries: this.data.entries,
+            chapters: this.data.chapters,
+            camps: this.data.camps,
+            synopsis: this.data.synopsis,
+            announcements: this.data.announcements,
+            homeContent: this.data.homeContent || [],
+            customFields: this.data.customFields || {},
+            
+            // 设置字段（兼容GitHub版和本地版格式）
+            settings: {
+                name: this.data.wikiTitle,
+                subtitle: this.data.wikiSubtitle,
+                welcomeTitle: this.data.welcomeTitle,
+                welcomeSubtitle: this.data.welcomeSubtitle,
+                customFont: this.data.fontFamily
+            },
+            wikiTitle: this.data.wikiTitle, // 冗余保留确保兼容
+            wikiSubtitle: this.data.wikiSubtitle,
+            fontFamily: this.data.fontFamily,
+            
+            // 元数据
+            version: '2.5.0-github',
+            exportTime: Date.now()
+        };
         
         const zip = new JSZip();
-        zip.file('wiki-manifest.json', JSON.stringify(this.data, null, 2));
+        zip.file('data.json', JSON.stringify(exportData, null, 2));
         
         const imagesFolder = zip.folder('wiki-images');
         const imageList = await this.githubStorage.getImageList();
