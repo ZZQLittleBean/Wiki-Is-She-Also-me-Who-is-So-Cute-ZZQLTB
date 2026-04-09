@@ -322,6 +322,23 @@ Object.assign(window.app, {
             
             if (data) {
                 this.data = { ...this.data, ...data };
+                
+                // 【关键修复】确保 settings 对象存在
+                if (!this.data.settings) {
+                    this.data.settings = {};
+                }
+                
+                // 【关键修复】兼容性处理：将根级字段同步到 settings（如果 settings 中缺失）
+                const s = this.data.settings;
+                if (!s.name && this.data.wikiTitle) s.name = this.data.wikiTitle;
+                if (!s.subtitle && this.data.wikiSubtitle) s.subtitle = this.data.wikiSubtitle;
+                if (!s.welcomeTitle && this.data.welcomeTitle) s.welcomeTitle = this.data.welcomeTitle;
+                if (!s.welcomeSubtitle && this.data.welcomeSubtitle) s.welcomeSubtitle = this.data.welcomeSubtitle;
+                
+                // 【关键修复】反向同步：确保根级字段也有值（兼容旧代码）
+                if (s.name && !this.data.wikiTitle) this.data.wikiTitle = s.name;
+                if (s.subtitle && !this.data.wikiSubtitle) this.data.wikiSubtitle = s.subtitle;
+                
                 // 确保所有必要字段存在
                 if (!this.data.entries) this.data.entries = [];
                 if (!this.data.chapters) this.data.chapters = [];
@@ -330,6 +347,8 @@ Object.assign(window.app, {
                 if (!this.data.announcements) this.data.announcements = [];
                 if (!this.data.customFields) this.data.customFields = {};
                 if (!this.data.homeContent) this.data.homeContent = [];
+                
+                console.log('[Wiki Data] 加载成功，settings:', this.data.settings);
             } else {
                 // 首次使用，创建空数据
                 this.data.entries = [];
@@ -339,6 +358,12 @@ Object.assign(window.app, {
                 this.data.announcements = [];
                 this.data.customFields = {};
                 this.data.homeContent = [];
+                this.data.settings = {
+                    name: '未命名 Wiki',
+                    subtitle: '',
+                    welcomeTitle: '欢迎来到 Wiki',
+                    welcomeSubtitle: '探索角色、世界观与错综复杂的关系网。'
+                };
             }
             
             this.applyFont();
@@ -524,32 +549,36 @@ Object.assign(window.app, {
         if (!tpl) return;
         
         const clone = tpl.content.cloneNode(true);
-        container.appendChild(clone);  // 【关键】先添加到 DOM
+        container.appendChild(clone); // 【关键】必须先插入 DOM
         
-        // 【修复】在 DOM 插入后通过 document 获取元素，确保正确绑定
+        // 【关键修复】强制从 this.data.settings 读取（而非 this.data 根级别）
+        const settings = this.data.settings || {};
+        
+        // 获取大蓝框元素（此时必须从 document 获取，而非 clone）
         const welcomeTitleEl = document.getElementById('welcome-title');
         const welcomeSubtitleEl = document.getElementById('welcome-subtitle');
         
-        // 【关键】优先使用 settings 中的字段（根据 data.json 结构）
-        const welcomeTitle = this.data.settings?.welcomeTitle || '欢迎来到 Wiki';
-        const welcomeSubtitle = this.data.settings?.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
+        // 【调试用】确认数据存在（浏览器控制台查看）
+        console.log('[Wiki Debug] settings.welcomeTitle:', settings.welcomeTitle);
+        console.log('[Wiki Debug] settings.welcomeSubtitle:', settings.welcomeSubtitle);
         
+        // 【关键修复】直接赋值 settings 中的字段
         if (welcomeTitleEl) {
-            welcomeTitleEl.textContent = welcomeTitle;
+            welcomeTitleEl.textContent = settings.welcomeTitle || '欢迎来到 Wiki';
         }
         if (welcomeSubtitleEl) {
-            welcomeSubtitleEl.textContent = welcomeSubtitle;
+            welcomeSubtitleEl.textContent = settings.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
         }
         
-        // 【修复】同时确保左上角工具栏同步更新（避免显示旧数据）
+        // 【同步修复】左上角工具栏（防止显示旧数据）
         const headerTitleEl = document.getElementById('wiki-title-display');
         const headerSubEl = document.getElementById('wiki-subtitle-display');
         
         if (headerTitleEl) {
-            headerTitleEl.textContent = this.data.settings?.name || this.data.wikiTitle || '未命名 Wiki';
+            headerTitleEl.textContent = settings.name || this.data.wikiTitle || '未命名 Wiki';
         }
         if (headerSubEl) {
-            const subtitle = this.data.settings?.subtitle || '';
+            const subtitle = settings.subtitle || '';
             headerSubEl.textContent = subtitle;
             headerSubEl.classList.toggle('hidden', !subtitle);
         }
@@ -559,16 +588,14 @@ Object.assign(window.app, {
             el.classList.toggle('hidden', this.runMode !== 'backend');
         });
         
-        // 【修复】后台入口区域显示逻辑
+        // 后台入口区域
         const backendEntry = document.getElementById('backend-entry-section');
         if (backendEntry) {
             backendEntry.classList.toggle('hidden', this.runMode === 'backend');
         }
         
-        // 【修复】渲染首页自定义内容
+        // 渲染其他内容
         this.renderHomeCustomContent();
-        
-        // 【修复】显示公告
         this.renderAnnouncementBanner();
     },
 
