@@ -90,8 +90,8 @@
             }
         },
 
-        // 创建或更新文件
-        async putFile(path, content, message = 'Update via Wiki') {
+        // 创建或更新文件（添加重试机制避免 409 冲突）
+        async putFile(path, content, message = 'Update via Wiki', retryCount = 3) {
             try {
                 let sha = null;
                 try {
@@ -99,7 +99,9 @@
                     if (existing) {
                         sha = existing.sha;
                     }
-                } catch (e) {}
+                } catch (e) {
+                    // 文件不存在，无需 SHA
+                }
 
                 const body = {
                     message: message,
@@ -118,6 +120,13 @@
                 });
 
                 if (!response.ok) {
+                    // 【修复】409 冲突时重试
+                    if (response.status === 409 && retryCount > 0) {
+                        console.warn(`[GitHub] 409 冲突，${retryCount} 秒后重试...`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        // 重新获取最新 SHA
+                        return this.putFile(path, content, message, retryCount - 1);
+                    }
                     throw new Error(`GitHub API错误: ${response.status}`);
                 }
 
