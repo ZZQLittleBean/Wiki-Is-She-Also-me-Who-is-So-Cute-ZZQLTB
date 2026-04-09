@@ -389,18 +389,20 @@ Object.assign(window.app, {
     },
     // ========== 根据模式更新UI ==========
     updateUIForMode() {
-        // 【修复】更新左上角工具栏 - 使用唯一变量名避免冲突
+        // 【修复】更新左上角工具栏 - 正确读取 settings 字段
         const headerTitleEl = document.getElementById('wiki-title-display');
         const headerSubEl = document.getElementById('wiki-subtitle-display');
         
         if (headerTitleEl) {
-            headerTitleEl.textContent = this.data.wikiTitle || '未命名 Wiki';
+            // 优先使用 settings.name，回退到 wikiTitle
+            headerTitleEl.textContent = this.data.settings?.name || this.data.wikiTitle || '未命名 Wiki';
         }
         
         // 【修复】显示全局声明（subtitle）在左上角
         if (headerSubEl) {
-            const hasSubtitle = !!(this.data.wikiSubtitle && this.data.wikiSubtitle.trim());
-            headerSubEl.textContent = this.data.wikiSubtitle || '';
+            const subtitle = this.data.settings?.subtitle || this.data.wikiSubtitle || '';
+            const hasSubtitle = !!(subtitle && subtitle.trim());
+            headerSubEl.textContent = subtitle;
             headerSubEl.classList.toggle('hidden', !hasSubtitle);
             // 确保样式正确：小字体、灰色、不换行截断
             headerSubEl.className = hasSubtitle ? 
@@ -523,19 +525,19 @@ Object.assign(window.app, {
         
         const clone = tpl.content.cloneNode(true);
         
-        // 【修复】正确绑定欢迎语到首页大蓝框（使用唯一变量名）
+        // 【修复】正确绑定欢迎语到首页大蓝框 - 从 settings 读取
         const welcomeTitleEl = clone.getElementById('welcome-title');
         const welcomeSubtitleEl = clone.getElementById('welcome-subtitle');
         
-        // 优先使用 welcomeTitle/welcomeSubtitle，回退到 wikiTitle/wikiSubtitle
+        // 优先使用 settings.welcomeTitle/welcomeSubtitle
         if (welcomeTitleEl) {
-            welcomeTitleEl.textContent = this.data.welcomeTitle || this.data.settings?.welcomeTitle || this.data.wikiTitle || '欢迎来到 Wiki';
+            welcomeTitleEl.textContent = this.data.settings?.welcomeTitle || this.data.welcomeTitle || '欢迎来到 Wiki';
         }
         if (welcomeSubtitleEl) {
-            welcomeSubtitleEl.textContent = this.data.welcomeSubtitle || this.data.settings?.welcomeSubtitle || this.data.wikiSubtitle || '探索角色、世界观与错综复杂的关系网。';
+            welcomeSubtitleEl.textContent = this.data.settings?.welcomeSubtitle || this.data.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
         }
         
-        // 显示/隐藏编辑按钮
+        // 显示/隐藏编辑按钮（确保 edit-only 类正确处理）
         clone.querySelectorAll('.edit-only').forEach(el => {
             el.classList.toggle('hidden', this.runMode !== 'backend');
         });
@@ -551,7 +553,7 @@ Object.assign(window.app, {
         // 【修复】渲染首页自定义内容（任意模式都显示）
         this.renderHomeCustomContent();
         
-        // 【修复】显示公告
+        // 【修复】显示公告（带背景框）
         this.renderAnnouncementBanner();
     },
 

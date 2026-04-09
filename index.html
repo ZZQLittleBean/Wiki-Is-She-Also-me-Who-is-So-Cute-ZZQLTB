@@ -55,6 +55,20 @@
             margin-top: 8px;
             border: 1px solid #e5e7eb;
         }
+        .announcement-banner {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
+            margin-bottom: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: none;
+        }
+        .announcement-banner:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+        }
 
         /* 弹窗样式 */
         .modal-overlay {
@@ -117,6 +131,7 @@
             </div>
             <div class="min-w-0">
                 <h1 id="wiki-title-display" class="text-lg font-bold text-gray-900 truncate">未命名 Wiki</h1>
+                <p id="wiki-subtitle-display" class="text-[10px] text-gray-500 truncate mt-0.5 hidden"></p>
             </div>
         </div>
 
@@ -320,7 +335,8 @@
                         <button onclick="app.createEntry('non-character')" class="bg-indigo-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-indigo-400 transition border border-indigo-400">
                             <i class="fa-solid fa-plus mr-1"></i> 设定
                         </button>
-                        <label class="bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-emerald-400 transition border border-emerald-400 cursor-pointer">
+                        <!-- 批量导入按钮（本地版功能，GitHub版可隐藏） -->
+                        <label class="edit-only hidden bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-sm font-semibold hover:bg-emerald-400 transition border border-emerald-400 cursor-pointer">
                             <i class="fa-solid fa-file-import mr-1"></i> 批量导入角色
                             <input type="file" class="hidden" accept=".txt" onchange="app.batchImportCharacters(this)">
                         </label>
