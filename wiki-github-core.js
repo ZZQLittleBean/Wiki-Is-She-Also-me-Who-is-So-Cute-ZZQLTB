@@ -403,6 +403,18 @@ Object.assign(window.app, {
             }
             
             console.log('[Wiki] ✅ 数据加载完成，词条数:', entries.length, 'homeContent:', this.data.homeContent?.length);
+            console.log('[Wiki] 数据详情:', {
+                entries: this.data.entries?.length,
+                homeContent: this.data.homeContent?.length,
+                announcements: this.data.announcements?.length,
+                synopsis: this.data.synopsis?.length,
+                settings: this.data.settings?.name
+            });
+
+            // 【关键】如果 homeContent 存在但页面未显示，强制重新渲染
+            if (this.data.homeContent && this.data.homeContent.length > 0) {
+                console.log('[Wiki] homeContent 数据:', JSON.stringify(this.data.homeContent));
+            }
             
             this.applyFont();
             this.updateUIForMode();
@@ -518,7 +530,6 @@ Object.assign(window.app, {
         const clone = tpl.content.cloneNode(true);
         container.appendChild(clone);
         
-        // 从 settings 读取欢迎语
         const settings = this.data.settings || {};
         
         const welcomeTitleEl = document.getElementById('welcome-title');
@@ -542,33 +553,40 @@ Object.assign(window.app, {
             backendEntry.classList.toggle('hidden', this.runMode === 'backend');
         }
         
-        // 【关键修复】确保自定义内容和公告在两种模式下都渲染
+        // 【关键】确保自定义内容和公告渲染
         this.renderHomeCustomContent();
         this.renderAnnouncementBanner();
         
-        // 渲染历史记录（如果有）
-        this.renderHistoryIfExists();
+        // 【删除】移除了不存在的 this.renderHistoryIfExists() 调用
     },
 
     // 【完整替换】renderHomeCustomContent 函数 - 修复前台模式显示
     renderHomeCustomContent() {
         const container = document.getElementById('home-custom-content');
         if (!container) {
-            console.warn('[HomeCustom] 找不到容器 #home-custom-content');
+            console.warn('[HomeCustom] 找不到容器');
             return;
         }
         
+        // 【调试】打印当前数据状态
+        console.log('[HomeCustom] 开始渲染:', {
+            containerFound: !!container,
+            homeContentExists: !!this.data.homeContent,
+            homeContentLength: this.data.homeContent?.length,
+            mode: this.runMode,
+            firstItem: this.data.homeContent?.[0]
+        });
+        
         container.innerHTML = '';
         
-        // 检查数据是否存在
+        // 如果数据不存在或为空
         if (!this.data.homeContent || !Array.isArray(this.data.homeContent) || this.data.homeContent.length === 0) {
-            console.log('[HomeCustom] 无自定义内容', this.runMode);
+            console.log('[HomeCustom] 无数据可渲染');
             if (this.runMode === 'backend') {
                 container.innerHTML = '<p class="text-gray-400 text-center py-4 text-sm">点击上方按钮添加自定义内容</p>';
             }
             return;
         }
-        
         console.log(`[HomeCustom] 渲染 ${this.data.homeContent.length} 项，模式: ${this.runMode}`);
         
         this.data.homeContent.forEach((item, idx) => {
@@ -2241,6 +2259,22 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                         }
                     }
                 });
+            }
+            // 合并首页自定义内容（智能合并）
+            const importedHomeContent = importedData.homeContent || importedData.data?.homeContent || [];
+            if (mode === 'replace') {
+                this.data.homeContent = importedHomeContent;
+                console.log(`[Import] 替换 homeContent: ${importedHomeContent.length} 项`);
+            } else {
+                // 合并模式：去重合并（基于 entryId 或内容）
+                const existingIds = new Set(this.data.homeContent.map(i => i.entryId || i.content));
+                importedHomeContent.forEach(item => {
+                    const itemKey = item.entryId || item.content;
+                    if (!existingIds.has(itemKey)) {
+                        this.data.homeContent.push(item);
+                    }
+                });
+                console.log(`[Import] 合并 homeContent: 现有 ${this.data.homeContent.length} 项, 导入 ${importedHomeContent.length} 项`);
             }
             
             // 合并其他数据
