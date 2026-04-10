@@ -1,5 +1,272 @@
 [
   {
+    "id": "char-1774026694075-pddxgmmb6",
+    "type": "character",
+    "code": "C-008",
+    "camp": "同学组A",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-h3ck67fwo",
+        "title": "解顶",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": "ch-1774186885948-o6muc",
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075,
+        "level": 3
+      }
+    ],
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null
+  },
+  {
+    "id": "char-1774026694075-bd758umqs",
+    "type": "character",
+    "code": "C-009",
+    "camp": "同学组A",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-pdzwfsfdv",
+        "title": "王磁炮",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": "ch-1774186885948-o6muc",
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075,
+        "level": 3
+      }
+    ],
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null
+  },
+  {
+    "id": "char-1774026694075-x8xop0wzb",
+    "type": "character",
+    "code": "C-010",
+    "level": 5,
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-8maosavpn",
+        "title": "葛茗茗",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075
+      }
+    ]
+  },
+  {
+    "id": "char-1774026694075-7bjnusb2d",
+    "type": "character",
+    "code": "C-011",
+    "level": 5,
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-gwai28x6z",
+        "title": "葛荧荧",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075
+      }
+    ]
+  },
+  {
+    "id": "char-1774026694075-h2nh765en",
+    "type": "character",
+    "code": "C-012",
+    "level": 5,
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-u7a9xkygj",
+        "title": "葛苧苧",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075
+      }
+    ]
+  },
+  {
+    "id": "char-1774026694075-5abfiv77y",
+    "type": "character",
+    "code": "C-013",
+    "level": 5,
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-lgrv55egz",
+        "title": "Prizh",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075
+      }
+    ]
+  },
+  {
+    "id": "char-1774026694075-xgyqu152f",
+    "type": "character",
+    "code": "C-014",
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-087rwec5e",
+        "title": "微光",
+        "subtitle": "世界的至高存在，或者说是“本源”。\n由于张可云这个“世界之核”的存在，她貌似更愿意成为这“国际象棋”棋盘上的“皇后”。\n当然，她或许也挺喜欢以一个普通人的形象观察这个世界？",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": "ch-1774186885948-fbqoj",
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [
+          {
+            "charId": "char-1774026694075-wyzxy3xpt",
+            "relationName": "“命定的师徒”"
+          },
+          {
+            "charId": "char-xiaoli",
+            "relationName": "“世界”之缔约"
+          }
+        ],
+        "createdAt": 1774026694075,
+        "level": 2
+      }
+    ],
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null
+  },
+  {
+    "id": "char-1774026694075-8gq06dj20",
+    "type": "character",
+    "code": "C-015",
+    "level": 5,
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-3flvwobbk",
+        "title": "塞坦",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075
+      }
+    ]
+  },
+  {
+    "id": "char-1774026694075-y6atk7qsi",
+    "type": "character",
+    "code": "C-016",
+    "level": 5,
+    "camp": "",
+    "pinned": false,
+    "versions": [
+      {
+        "vid": "v-1774026694075-r771wtfak",
+        "title": "汤圆",
+        "subtitle": "",
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774026694075
+      }
+    ]
+  },
+  {
     "id": "char-1774026694075-wyzxy3xpt",
     "type": "character",
     "code": "C-017",
@@ -530,170 +797,6 @@
         "relatedVersions": [],
         "relatedCharacters": [],
         "createdAt": 1774544495965
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-zuwzm",
-    "type": "character",
-    "code": "C-025",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-lxfn1",
-        "title": "老爸",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是老爸的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-6mpm0",
-    "type": "character",
-    "code": "C-026",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-f64zz",
-        "title": "冯程才",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是冯程才的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-68kzu",
-    "type": "character",
-    "code": "C-027",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-90sh9",
-        "title": "马米粒",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是马米粒的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-cyrwx",
-    "type": "character",
-    "code": "C-028",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-m56cr",
-        "title": "张桥",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是张桥的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
       }
     ]
   }
