@@ -172,7 +172,8 @@ Object.assign(window.app, {
             this.router('home');
         }
         
-        setTimeout(() => this.checkImportResume(), 1000);
+                // 延迟执行自检
+        setTimeout(() => this.periodicDataCheck(), 3000);
     },
 
     // ========== 登录页面 ==========
@@ -471,101 +472,132 @@ Object.assign(window.app, {
         });
     },
 
-    // 【完整替换】resolveImageReferences 函数 - 增强版
+    // 【长期防护 V2】增强版引用解析，自动容错各种截断
     resolveImageReferences() {
-        if (!this.githubStorage?.config?.owner) {
-            console.warn('[Resolve] 无GitHub配置，跳过');
-            return;
-        }
+        if (!this.githubStorage?.config?.owner || !this.data?.entries) return;
         
         const { owner, repo, branch, dataPath } = this.githubStorage.config;
-        const safeDataPath = dataPath || 'wiki-data';
-        // 【关键】确保URL格式正确，末尾无斜杠重复
-        const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${safeDataPath}/images/`;
-        
-        let resolvedCount = 0;
-        
-        // 解析函数：将 {{IMG:filename}} 转换为完整URL
-        const resolveValue = (val) => {
-            if (!val || typeof val !== 'string') return null;
-            if (val.startsWith('http')) return val; // 已解析
-            
-            // 匹配 {{IMG:filename}} 格式（支持空格）
-            const match = val.match(/\{\{IMG:\s*([^}]+)\s*\}\}/);
-            if (match && match[1]) {
-                resolvedCount++;
-                return baseUrl + encodeURIComponent(match[1].trim());
-            }
-            return null;
-        };
+        const base = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath || 'wiki-data'}/images/`;
+        let stats = { resolved: 0, fixed: 0, errors: [] };
 
-        // 处理所有条目
-        if (!this.data?.entries || !Array.isArray(this.data.entries)) {
-            console.warn('[Resolve] 无条目数据');
-            return;
-        }
-
-        this.data.entries.forEach(entry => {
-            if (!entry?.versions) return;
-            
-            entry.versions.forEach(version => {
-                if (!version) return;
+        this.data.entries.forEach((e, ei) => {
+            e.versions?.forEach((v, vi) => {
+                if (!v.images) v.images = {};
                 
-                // 【关键修复】确保 images 对象存在，防止 null 错误
-                if (!version.images || typeof version.images !== 'object') {
-                    version.images = { avatar: null, card: null, cover: null };
-                }
-                
-                // 清理残留的 base64（防止数据污染）
-                if (version.image?.startsWith('data:')) version.image = null;
-                
-                // 解析新版 images 对象的各个字段
                 ['avatar', 'card', 'cover'].forEach(type => {
-                    const current = version.images[type];
+                    let val = v.images[type];
+                    if (!val || typeof val !== 'string') return;
                     
-                    // 如果是 base64，清空
-                    if (current?.startsWith('data:')) {
-                        version.images[type] = null;
-                        return;
+                    // 防御性复制
+                    let original = val;
+                    
+                    // 第1层：处理已解析的URL（以 .jp 结尾但未完成）
+                    if (val.startsWith('http')) {
+                        // 检测并修复 URL 中的截断
+                        if (val.endsWith('.jp') && !val.endsWith('.jpg')) {
+                            val = val + 'g';
+                            stats.fixed++;
+                            console.warn(`[AutoFix] 条目[${ei}] ${e.code} URL截断修复: .jp -> .jpg`);
+                        }
+                        // 其他常见截断
+                        val = val.replace(/\.jpeg$/g, '.jpg').replace(/\.jpe$/g, '.jpg');
+                    }
+                    // 第2层：处理 {{IMG:...}} 格式内的截断
+                    else if (val.includes('{{IMG:')) {
+                        // 提取文件名并修复截断
+                        val = val.replace(/\{\{IMG:\s*([^\}]+?)(\.jp|\.jpe|\.pn)(g?)\}\}/g, (match, p1, p2, p3) => {
+                            if (!p3) { // p3 是空的，说明缺少 g
+                                stats.fixed++;
+                                return `{{IMG:${p1}${p2}g}}`;
+                            }
+                            return match;
+                        });
+                        
+                        // 解析为完整 URL
+                        const match = val.match(/\{\{IMG:\s*([^\}]+)\s*\}\}/);
+                        if (match && match[1]) {
+                            let filename = match[1].trim();
+                            // 最终检查文件名完整性
+                            if (!filename.match(/\.(jpg|jpeg|png|gif|webp)$/i)) {
+                                // 无扩展名或异常，尝试补全 jpg
+                                if (filename.match(/\.jp$/i)) filename += 'g';
+                                stats.errors.push({entry: e.code, type, filename});
+                            }
+                            val = base + encodeURIComponent(filename);
+                            stats.resolved++;
+                        }
                     }
                     
-                    // 如果有值且未解析，进行解析
-                    if (current && typeof current === 'string' && !current.startsWith('http')) {
-                        const newUrl = resolveValue(current);
-                        if (newUrl) version.images[type] = newUrl;
+                    if (val !== original) {
+                        v.images[type] = val;
                     }
                 });
                 
-                // 兼容旧版单 image 字段（优先使用 card，其次 avatar）
-                if (version.image && typeof version.image === 'string' && !version.image.startsWith('http')) {
-                    const newUrl = resolveValue(version.image);
-                    if (newUrl) version.image = newUrl;
-                } else if (!version.image && version.images) {
-                    // 【新增】自动从 images 对象推导 image 字段
-                    version.image = version.images.card || version.images.avatar || version.images.cover || null;
+                // 同步旧版字段（同样检查截断）
+                let img = v.images?.card || v.images?.avatar || v.images?.cover;
+                if (img && typeof img === 'string' && img.endsWith('.jp') && !img.endsWith('.jpg')) {
+                    img = img + 'g';
+                    v.images.card = v.images.card?.endsWith('.jp') ? v.images.card + 'g' : v.images.card;
                 }
+                v.image = img || v.image;
             });
         });
 
-        // 处理剧情梗概图片
-        if (this.data.synopsis?.length > 0) {
-            this.data.synopsis.forEach(syn => {
-                if (syn.image?.startsWith('data:')) syn.image = null;
-                if (syn.image && typeof syn.image === 'string' && !syn.image.startsWith('http')) {
-                    const newUrl = resolveValue(syn.image);
-                    if (newUrl) syn.image = newUrl;
-                }
-            });
-        }
-
-        console.log(`[Resolve] 完成：解析了 ${resolvedCount} 个图片引用`);
+        console.log(`[Resolve] 完成: ${stats.resolved} 个已解析, ${stats.fixed} 个截断已修复`);
         
-        // 【新增】如果解析了图片，强制刷新当前视图
-        if (resolvedCount > 0) {
-            console.log('[Resolve] 检测到图片更新，刷新视图...');
-            const currentRoute = this.data.currentTarget || 'home';
-            this.router(currentRoute, false);
+        // 如果有修复，自动刷新视图
+        if (stats.fixed > 0) {
+            this.showToast(`已自动修复 ${stats.fixed} 个图片链接截断`, 'warning');
+            setTimeout(() => this.router(this.data.currentTarget || 'home', false), 100);
         }
+        
+        return stats;
+    },
+        // 【长期防护】保存前强制校验，确保所有图片引用格式正确
+    validateAndFixData() {
+        let fixedCount = 0;
+        const issues = [];
+        
+        this.data.entries.forEach(entry => {
+            if (!entry.versions) return;
+            
+            entry.versions.forEach(v => {
+                if (!v.images) v.images = {};
+                
+                ['avatar', 'card', 'cover'].forEach(type => {
+                    let val = v.images[type];
+                    if (!val || typeof val !== 'string') return;
+                    
+                    // 强制检查 {{IMG:...}} 格式内的文件名
+                    if (val.includes('{{IMG:')) {
+                        const match = val.match(/\{\{IMG:\s*([^\}]+)\}\}/);
+                        if (match) {
+                            let filename = match[1];
+                            
+                            // 检测截断并强制修复
+                            if (filename.endsWith('.jp') || filename.endsWith('.jpe') || filename.endsWith('.pn')) {
+                                console.error(`[DataCheck] 发现截断: ${entry.code}.${type} = ${filename}`);
+                                filename = filename + 'g'; // 补全
+                                v.images[type] = `{{IMG:${filename}}}`;
+                                fixedCount++;
+                                issues.push(`${entry.code}.${type}: ${filename}`);
+                            }
+                            // 检测异常字符
+                            else if (filename.includes('?') || filename.includes('&')) {
+                                console.error(`[DataCheck] 发现异常字符: ${entry.code}.${type}`);
+                                v.images[type] = null; // 清除无效引用
+                                fixedCount++;
+                            }
+                        }
+                    }
+                });
+            });
+        });
+        
+        if (fixedCount > 0) {
+            console.warn(`[DataCheck] 共修复 ${fixedCount} 处数据错误:`, issues);
+        }
+        return { fixed: fixedCount, issues };
     },
         // 【新增】自动修复缺失的图片引用（根据远程图片列表自动补全）
     async autoFixImageReferences() {
@@ -799,6 +831,43 @@ Object.assign(window.app, {
                 message: e.message,
                 type: 'error'
             });
+        }
+    },
+        // 【长期防护】定期自检，发现截断立即告警并修复
+    async periodicDataCheck() {
+        // 只在后台模式执行
+        if (this.runMode !== 'backend') return;
+        
+        let truncatedFound = 0;
+        
+        this.data.entries.forEach(e => {
+            e.versions?.forEach(v => {
+                ['avatar', 'card', 'cover'].forEach(type => {
+                    const val = v.images?.[type];
+                    if (typeof val === 'string') {
+                        // 检测各种截断模式
+                        const isTruncated = 
+                            val.endsWith('.jp}}') || 
+                            val.endsWith('.jp') && !val.endsWith('.jpg') ||
+                            val.includes('.jp/') ||
+                            /char-[^_]+_v-\d+_card\.jp[^g]/.test(val); // 正则匹配截断模式
+                        
+                        if (isTruncated) {
+                            console.error(`[PeriodicCheck] 发现截断: ${e.code}.${type} = ${val}`);
+                            truncatedFound++;
+                        }
+                    }
+                });
+            });
+        });
+        
+        if (truncatedFound > 0) {
+            console.warn(`[PeriodicCheck] 发现 ${truncatedFound} 处截断，建议执行修复`);
+            // 可选：自动触发修复
+            // this.resolveImageReferences();
+            // this.saveDataAtomic();
+        } else {
+            console.log('[PeriodicCheck] 数据完整性检查通过');
         }
     },
     initDefaultData() {
@@ -1702,6 +1771,12 @@ Object.assign(window.app, {
     async saveDataAtomic() {
         console.log('[Wiki] 执行原子保存...');
         
+        // 【长期防护】保存前强制校验并修复数据
+        const validation = this.validateAndFixData();
+        if (validation.fixed > 0) {
+            console.warn(`[Save] 已自动修复 ${validation.fixed} 处数据异常`);
+        }
+        
         // 深拷贝数据
         const dataToSave = JSON.parse(JSON.stringify(this.data));
         
@@ -2496,10 +2571,9 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             p.replace(/^images\//, '').replace(/^\/?/, '')
         ));
 
-        // 步骤 6: 【关键修复】强制更新 entries 中的图片引用
-        progress.update(50, '更新图片引用...');
+        // 步骤 6: 【长期防护】强制建立正确的 {{IMG:...}} 引用（源头控制）
+        progress.update(50, '建立图片引用映射（含完整性校验）...');
         
-        // 建立上传文件映射（去除路径前缀）
         const uploadedFiles = new Set(
             imageFiles.map(p => p.replace(/^images\//, '').replace(/^\/?/, ''))
         );
@@ -2508,29 +2582,31 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             if (!entry.versions) return;
             
             entry.versions.forEach(v => {
-                // 强制初始化 images 对象
-                if (!v.images || typeof v.images !== 'object') {
-                    v.images = { avatar: null, card: null, cover: null };
-                }
+                // 强制初始化 images 对象（清除旧的 null/base64/错误数据）
+                v.images = { avatar: null, card: null, cover: null };
                 
-                const filePatterns = {
+                const patterns = {
                     avatar: `${entry.id}_${v.vid}_avatar.jpg`,
                     card: `${entry.id}_${v.vid}_card.jpg`,
                     cover: `${entry.id}_${v.vid}_cover.jpg`
                 };
                 
-                // 强制匹配：只要远程有该文件，就设置引用（覆盖原有值）
                 ['avatar', 'card', 'cover'].forEach(type => {
-                    if (uploadedFiles.has(filePatterns[type])) {
-                        v.images[type] = `{{IMG:${filePatterns[type]}}`;
-                        console.log(`[Import] 设置 ${entry.code}.${type} = ${filePatterns[type]}`);
-                    } else if (v.images[type]?.startsWith('data:')) {
-                        // 清除残留的 base64
-                        v.images[type] = null;
+                    const expectedFile = patterns[type];
+                    
+                    // 严格校验：只有当远程确实上传了该文件，才建立引用
+                    if (uploadedFiles.has(expectedFile)) {
+                        // 确保文件名不以 .jp 结尾（异常检查）
+                        if (expectedFile.endsWith('.jp') && !expectedFile.endsWith('.jpg')) {
+                            console.error(`[Import] 异常文件名跳过: ${expectedFile}`);
+                            return;
+                        }
+                        v.images[type] = `{{IMG:${expectedFile}}}`;
+                        console.log(`[Import] 建立引用: ${entry.code}.${type} -> ${expectedFile}`);
                     }
                 });
                 
-                // 同步旧版 image 字段
+                // 同步旧版字段（优先 card）
                 v.image = v.images.card || v.images.avatar || v.images.cover || null;
             });
         });
@@ -3602,7 +3678,45 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
         this.saveData();
         this.showToast('首页内容已保存', 'success');
     },
+    // 【新增】设置页面专用的保存方法
+    async saveSettingsData() {
+        const btn = document.querySelector('#settings-save-status');
+        if (btn) {
+            btn.style.opacity = '0';
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>保存中...';
+            btn.style.opacity = '1';
+        }
 
+        try {
+            // 确保当前数据是最新的（包括字体设置等）
+            const fontSelect = document.getElementById('setting-font');
+            if (fontSelect) {
+                this.data.settings.customFont = fontSelect.value;
+                this.data.fontFamily = fontSelect.value;
+            }
+
+            // 使用原子保存确保数据完整性
+            await this.saveDataAtomic();
+            
+            // 显示成功状态
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-check-circle mr-1"></i>保存成功！';
+                setTimeout(() => {
+                    btn.style.opacity = '0';
+                }, 3000);
+            }
+            
+            this.showToast('设置已保存到 GitHub', 'success');
+            
+        } catch (error) {
+            console.error('保存失败:', error);
+            if (btn) {
+                btn.innerHTML = '<i class="fa-solid fa-exclamation-circle mr-1"></i>保存失败，请重试';
+                btn.classList.add('text-red-200');
+            }
+            this.showToast('保存失败: ' + error.message, 'error');
+        }
+    },
     // ========== 版本管理器（占位）==========
     showVersionManager() {
         this.showToast('版本管理器功能开发中', 'info');
