@@ -408,6 +408,15 @@ Object.assign(window.app, {
             if (this.data.synopsis && this.data.synopsis.length > 0) {
                 setTimeout(() => this.resolveSynopsisImages(), 100);
             }
+            // 【关键】数据合并完成后，确保 entries 存在
+            this.data.entries = entries || [];
+            
+            // 延迟解析图片引用，确保DOM和数据已稳定
+            setTimeout(() => {
+                this.resolveImageReferences();
+                // 如果有图片被解析，刷新当前视图
+                this.updateUIForMode();
+            }, 100);
             
             this.applyFont();
             this.updateUIForMode();
@@ -444,113 +453,82 @@ Object.assign(window.app, {
 
     // 【完整替换】resolveImageReferences 函数 - 强化版本
     resolveImageReferences() {
-        if (!this.githubStorage || !this.githubStorage.config || !this.githubStorage.config.owner) {
-            console.warn('[Resolve] 无GitHub配置，跳过');
+        if (!this.githubStorage?.config?.owner || !this.data?.entries) {
+            console.warn('[Resolve] 跳过：无GitHub配置或无条目数据');
             return;
         }
         
         const { owner, repo, branch, dataPath } = this.githubStorage.config;
-        
-        // 【关键修复】确保 dataPath 存在，防止 undefined 导致 URL 错误
         const safeDataPath = dataPath || 'wiki-data';
         const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${safeDataPath}/images/`;
         
-        let resolvedCount = 0;
-        let skippedCount = 0;
+        let resolved = 0;
         
-        console.log(`[Resolve] 开始解析图片引用，基础URL: ${baseUrl}`);
-        console.log(`[Resolve] 条目数量: ${this.data?.entries?.length || 0}`);
-
-        const resolveImageValue = (value) => {
-            // 【关键修复】严格检查类型，防止非字符串值导致错误
-            if (!value || typeof value !== 'string') return null;
+        const resolveVal = (val) => {
+            if (!val || typeof val !== 'string') return null;
+            if (val.startsWith('http')) return val; // 已解析
             
-            // 已经是完整URL，无需处理
-            if (value.startsWith('http')) {
-                skippedCount++;
-                return value;
-            }
-            
-            // 标准格式 {{IMG:filename}}
-            if (value.startsWith('{{IMG:') && value.endsWith('}}')) {
-                const filename = value.slice(6, -2);
-                // 【新增】过滤空文件名
-                if (!filename || filename.trim() === '') return null;
-                return baseUrl + encodeURIComponent(filename);
-            }
-            
-            // 容错：处理可能的双花括号内嵌格式
-            const match = value.match(/\{\{IMG:([^}]+)\}\}/);
+            // 匹配 {{IMG:filename}} 格式（支持多余空格）
+            const match = val.match(/\{\{IMG:\s*([^}]+)\s*\}\}/);
             if (match && match[1]) {
-                return baseUrl + encodeURIComponent(match[1]);
+                const filename = match[1].trim();
+                if (filename) {
+                    resolved++;
+                    return baseUrl + encodeURIComponent(filename);
+                }
             }
-            
             return null;
         };
 
-        // 1. 解析条目图片（增加空值保护）
-        if (this.data?.entries && Array.isArray(this.data.entries)) {
-            this.data.entries.forEach((entry, idx) => {
-                if (!entry || !entry.versions || !Array.isArray(entry.versions)) return;
+        // 处理所有条目的所有版本
+        this.data.entries.forEach(entry => {
+            if (!entry.versions) return;
+            
+            entry.versions.forEach(v => {
+                // 清理残留的base64（不应存在于GitHub版数据中）
+                if (v.image?.startsWith('data:')) v.image = null;
+                if (v.images) {
+                    ['avatar', 'card', 'cover'].forEach(k => {
+                        if (v.images[k]?.startsWith('data:')) v.images[k] = null;
+                    });
+                }
                 
-                entry.versions.forEach((version) => {
-                    if (!version) return;
-                    
-                    // 处理旧版单个image字段
-                    if (version.image && typeof version.image === 'string') {
-                        // 【修复】如果已经是data:开头的base64，清除它（不应存储在JSON中）
-                        if (version.image.startsWith('data:')) {
-                            console.warn(`[Resolve] 清除内嵌base64图片: ${entry.code}`);
-                            version.image = null;
-                            return;
-                        }
-                        
-                        const newUrl = resolveImageValue(version.image);
-                        if (newUrl && newUrl !== version.image) {
-                            console.log(`[Resolve] ${entry.code || idx} image 已解析`);
-                            version.image = newUrl;
-                            resolvedCount++;
-                        }
-                    }
-                    
-                    // 处理新版images对象
-                    if (version.images && typeof version.images === 'object') {
-                        ['avatar', 'card', 'cover'].forEach(type => {
-                            const value = version.images[type];
-                            if (value && typeof value === 'string') {
-                                // 【修复】同样清除内嵌base64
-                                if (value.startsWith('data:')) {
-                                    version.images[type] = null;
-                                    return;
-                                }
-                                
-                                const newUrl = resolveImageValue(value);
-                                if (newUrl && newUrl !== value) {
-                                    version.images[type] = newUrl;
-                                    resolvedCount++;
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-        }
-
-        // 2. 解析剧情梗概图片（同样增加保护）
-        if (this.data?.synopsis && Array.isArray(this.data.synopsis)) {
-            this.data.synopsis.forEach((syn, idx) => {
-                if (!syn?.image || typeof syn.image !== 'string') return;
+                // 解析旧版image字段
+                if (v.image && !v.image.startsWith('http')) {
+                    const newUrl = resolveVal(v.image);
+                    if (newUrl) v.image = newUrl;
+                }
                 
-                const newUrl = resolveImageValue(syn.image);
-                if (newUrl && newUrl !== syn.image) {
-                    console.log(`[Resolve] Synopsis[${idx}] 图片已解析`);
-                    syn.image = newUrl;
-                    resolvedCount++;
+                // 解析新版images对象
+                if (v.images && typeof v.images === 'object') {
+                    ['avatar', 'card', 'cover'].forEach(k => {
+                        if (v.images[k] && !v.images[k].startsWith('http')) {
+                            const newUrl = resolveVal(v.images[k]);
+                            if (newUrl) v.images[k] = newUrl;
+                        }
+                    });
                 }
             });
-        }
+        });
+        
+        // 解析剧情梗概图片
+        this.data.synopsis?.forEach(s => {
+            if (s.image?.startsWith('data:')) s.image = null;
+            if (s.image && !s.image.startsWith('http')) {
+                const newUrl = resolveVal(s.image);
+                if (newUrl) s.image = newUrl;
+            }
+        });
 
-        console.log(`[Resolve] 完成: ${resolvedCount} 个引用已解析, ${skippedCount} 个已跳过`);
+        console.log(`[Resolve] 完成：解析了 ${resolved} 个图片引用`);
+        
+        // 强制刷新当前页面以显示图片（如果是列表或详情页）
+        if (resolved > 0) {
+            const current = document.querySelector('.nav-btn.text-indigo-600')?.dataset.target || 'home';
+            if (['home', 'characters', 'non-characters'].includes(current)) {
+                this.router(current, false);
+            }
+        }
     },
 
     // 【完整替换】renderHome 函数 - 修复显示逻辑
@@ -2351,49 +2329,61 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             await new Promise(r => setTimeout(r, 500)); // 批次间延迟
         }
 
-        // 步骤 6: 更新数据中的图片引用
-        progress.update(50, '更新图片引用...');
-        
-        // 【关键修复】更新 entries 中的图片引用，匹配上传的文件名
+        // 步骤 5.5: 建立文件名映射（用于匹配entry和图片）
+        const uploadedFileSet = new Set(imageFiles.map(p => 
+            p.replace(/^images\//, '').replace(/^\/?/, '')
+        ));
+
+        // 步骤 6: 更新 entries 中的图片引用（关键修复）
         entries.forEach(entry => {
             if (!entry.versions) return;
-            entry.versions.forEach(version => {
-                // 处理旧版 image 字段
-                if (version.image && version.image.startsWith('data:')) {
-                    // 如果是base64，需要替换为引用（这种情况在导入时应已被清理）
-                    version.image = null;
-                }
-                
+            
+            entry.versions.forEach(v => {
                 // 处理新版 images 对象
-                if (version.images) {
+                if (v.images) {
                     ['avatar', 'card', 'cover'].forEach(type => {
-                        const value = version.images[type];
-                        if (value) {
-                            // 如果已经是 {{IMG:...}} 格式，确保文件名正确
-                            if (value.startsWith('{{IMG:')) {
-                                const imgName = value.slice(6, -2);
-                                // 验证该图片是否在上传列表中
-                                const exists = imageFiles.some(p => p.includes(imgName) || imgName === p.replace('images/', ''));
-                                if (!exists) {
-                                    console.warn(`[Import] 引用的图片不存在: ${imgName}`);
-                                }
-                            } else if (value.startsWith('data:')) {
-                                // 清理base64
-                                version.images[type] = null;
+                        const currentVal = v.images[type];
+                        // 如果是null或base64，尝试重建引用
+                        if (!currentVal || currentVal.startsWith('data:')) {
+                            const expectedFile = `${entry.id}_${v.vid}_${type}.jpg`;
+                            if (uploadedFileSet.has(expectedFile)) {
+                                v.images[type] = `{{IMG:${expectedFile}}}`;
+                                console.log(`[Import] 设置图片引用: ${expectedFile}`);
+                            } else {
+                                v.images[type] = null; // 未找到对应图片，清空
                             }
                         }
                     });
                 }
+                
+                // 处理旧版单个image字段（fallback到card或avatar）
+                if (!v.image || v.image.startsWith('data:')) {
+                    const candidates = ['card', 'avatar', 'cover'].map(t => 
+                        `${entry.id}_${v.vid}_${t}.jpg`
+                    );
+                    let found = null;
+                    for (const fname of candidates) {
+                        if (uploadedFileSet.has(fname)) {
+                            found = fname;
+                            break;
+                        }
+                    }
+                    v.image = found ? `{{IMG:${found}}}` : null;
+                }
             });
         });
-        
-        // 同样处理 synopsis 中的图片
+
+        // 【同时】确保 synopsis 中的图片引用也被处理
         if (importedData.synopsis) {
             importedData.synopsis.forEach(syn => {
-                if (syn.image && syn.image.startsWith('{{IMG:')) {
-                    const imgName = syn.image.slice(6, -2);
-                    const exists = imageFiles.some(p => p.includes(imgName));
-                    if (!exists) console.warn(`[Import] Synopsis引用的图片不存在: ${imgName}`);
+                if (!syn.image || syn.image.startsWith('data:')) {
+                    // 尝试查找 synopsis-{chapterId}-{timestamp}.jpg 格式的图片
+                    const possibleSynFiles = Array.from(uploadedFileSet).filter(f => 
+                        f.startsWith(`synopsis-${syn.chapterId || syn.id}`)
+                    );
+                    if (possibleSynFiles.length > 0) {
+                        syn.image = `{{IMG:${possibleSynFiles[0]}}}`;
+                    }
                 }
             });
         }
