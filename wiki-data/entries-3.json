@@ -1,0 +1,617 @@
+[
+  {
+    "id": "char-1774546471127-rs0hy",
+    "type": "character",
+    "code": "C-044",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-ado2j",
+        "title": "吴卷航",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是吴卷航的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-cbktx",
+    "type": "character",
+    "code": "C-045",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-opos9",
+        "title": "吴亚",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是吴亚的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-y3fj9",
+    "type": "character",
+    "code": "C-046",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-yvlw6",
+        "title": "胡上校",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是胡上校的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-jwsqg",
+    "type": "character",
+    "code": "C-047",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-oonns",
+        "title": "马聪",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是马聪的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-rb7ce",
+    "type": "character",
+    "code": "C-048",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-freqm",
+        "title": "梁金赫晓昂",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是梁金赫晓昂的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-ib9s4",
+    "type": "character",
+    "code": "C-049",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-e9nxk",
+        "title": "张源源",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是张源源的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-ya7bw",
+    "type": "character",
+    "code": "C-050",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-rdq51",
+        "title": "马暮光",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是马暮光的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-uv1yn",
+    "type": "character",
+    "code": "C-051",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-nej1s",
+        "title": "雷阵雨",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是雷阵雨的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-q5cn5",
+    "type": "character",
+    "code": "C-052",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-qsxlr",
+        "title": "毕碧梓",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是毕碧梓的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-764cz",
+    "type": "character",
+    "code": "C-053",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-1r6xc",
+        "title": "张癸癸",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是张癸癸的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-8duoa",
+    "type": "character",
+    "code": "C-054",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-we8gh",
+        "title": "李姐",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是李姐的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-rrfmj",
+    "type": "character",
+    "code": "C-055",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-vuazz",
+        "title": "姨爹",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是姨爹的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-e6em0",
+    "type": "character",
+    "code": "C-056",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-h0rv3",
+        "title": "公公",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是公公的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-34mwg",
+    "type": "character",
+    "code": "C-057",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-zs0k0",
+        "title": "阿婆",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是阿婆的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-fcutt",
+    "type": "character",
+    "code": "C-058",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-q1evl",
+        "title": "陈小鸥",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是陈小鸥的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  }
+]
