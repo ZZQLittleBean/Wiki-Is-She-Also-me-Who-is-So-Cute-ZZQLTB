@@ -394,37 +394,51 @@ Object.assign(window.app, {
     },
     // 【新增】解析图片引用，将 {{IMG:filename}} 转换为 GitHub Raw URL
     resolveImageReferences() {
-        if (!this.data.entries || !this.githubStorage.config.owner) return;
+        if (!this.githubStorage.config.owner) return;
         
         const { owner, repo, branch, dataPath } = this.githubStorage.config;
         const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}/images/`;
         
         let resolvedCount = 0;
         
-        this.data.entries.forEach(entry => {
-            if (!entry.versions) return;
-            
-            entry.versions.forEach(version => {
-                // 处理旧版单个image字段
-                if (version.image && version.image.startsWith('{{IMG:')) {
-                    const filename = version.image.slice(6, -2);
-                    version.image = baseUrl + filename;
+        // 1. 解析条目图片
+        if (this.data.entries) {
+            this.data.entries.forEach(entry => {
+                if (!entry.versions) return;
+                
+                entry.versions.forEach(version => {
+                    // 处理旧版单个image字段
+                    if (version.image && version.image.startsWith('{{IMG:')) {
+                        const filename = version.image.slice(6, -2);
+                        version.image = baseUrl + filename;
+                        resolvedCount++;
+                    }
+                    
+                    // 处理新版images对象
+                    if (version.images) {
+                        ['avatar', 'card', 'cover'].forEach(type => {
+                            const value = version.images[type];
+                            if (value && value.startsWith('{{IMG:')) {
+                                const filename = value.slice(6, -2);
+                                version.images[type] = baseUrl + filename;
+                                resolvedCount++;
+                            }
+                        });
+                    }
+                });
+            });
+        }
+        
+        // 2. 【新增】解析剧情梗概图片
+        if (this.data.synopsis) {
+            this.data.synopsis.forEach(syn => {
+                if (syn.image && syn.image.startsWith('{{IMG:')) {
+                    const filename = syn.image.slice(6, -2);
+                    syn.image = baseUrl + filename;
                     resolvedCount++;
                 }
-                
-                // 处理新版images对象
-                if (version.images) {
-                    ['avatar', 'card', 'cover'].forEach(type => {
-                        const value = version.images[type];
-                        if (value && value.startsWith('{{IMG:')) {
-                            const filename = value.slice(6, -2);
-                            version.images[type] = baseUrl + filename;
-                            resolvedCount++;
-                        }
-                    });
-                }
             });
-        });
+        }
         
         if (resolvedCount > 0) {
             console.log(`[Wiki] 已解析 ${resolvedCount} 个图片引用`);
@@ -966,19 +980,31 @@ Object.assign(window.app, {
         const clone = tpl.content.cloneNode(true);
         container.appendChild(clone);
         
-        // 同步剧情梗概与章节
-        this.syncSynopsisWithChapters();
+        // 【注意】不再在这里调用 syncSynopsisWithChapters，避免覆盖数据
+        // 数据应该在加载/导入时已经同步好
         
         const list = document.getElementById('synopsis-view-list');
         if (list) {
             this.data.synopsis.forEach(chapter => {
                 const item = document.createElement('div');
                 item.className = 'synopsis-chapter-item p-6 border-b border-gray-200';
+                
+                // 【新增】构建图片HTML（如果有）
+                let imageHtml = '';
+                if (chapter.image && chapter.image.startsWith('http')) {
+                    imageHtml = `
+                        <div class="mb-4 rounded-xl overflow-hidden shadow-md">
+                            <img src="${chapter.image}" class="w-full max-h-64 object-cover" alt="${chapter.title}" onerror="this.style.display='none'">
+                        </div>
+                    `;
+                }
+                
                 item.innerHTML = `
-                    <h3 class="text-xl font-bold text-gray-800 mb-2">
+                    <h3 class="text-xl font-bold text-gray-800 mb-3">
                         <span class="text-indigo-600 mr-2">${this.formatChapterNum(chapter.num)}</span>
-                        ${chapter.title}
+                        ${chapter.title || `第${chapter.num}章`}
                     </h3>
+                    ${imageHtml}
                     <div class="prose prose-sm max-w-none text-gray-600">
                         ${chapter.content ? chapter.content.replace(/\n/g, '<br>') : '<p class="text-gray-400 italic">暂无内容</p>'}
                     </div>
@@ -998,23 +1024,42 @@ Object.assign(window.app, {
         const clone = tpl.content.cloneNode(true);
         container.appendChild(clone);
         
-        this.syncSynopsisWithChapters();
-        
         const list = document.getElementById('synopsis-chapters-list');
         if (list) {
             this.data.synopsis.forEach(chapter => {
                 const item = document.createElement('div');
                 item.className = 'bg-white rounded-lg border border-gray-200 mb-4 overflow-hidden';
+                
+                // 【新增】图片显示区域
+                let imageSection = '';
+                if (chapter.image) {
+                    imageSection = `
+                        <div class="relative mb-3 rounded-lg overflow-hidden bg-gray-100 h-32">
+                            <img src="${chapter.image}" class="w-full h-full object-cover" onerror="this.src=''">
+                            <button onclick="app.removeSynopsisImage('${chapter.id}')" class="absolute top-2 right-2 bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center hover:bg-red-600">
+                                <i class="fa-solid fa-times text-xs"></i>
+                            </button>
+                        </div>
+                    `;
+                }
+                
                 item.innerHTML = `
                     <div class="flex items-center gap-3 p-3 bg-gray-50 border-b border-gray-200">
                         <span class="bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded text-xs font-bold">${this.formatChapterNum(chapter.num)}</span>
                         <input type="text" class="flex-1 bg-transparent border-none outline-none text-sm font-medium" 
-                            value="${chapter.title}" onchange="app.updateSynopsisTitle('${chapter.id}', this.value)">
+                            value="${chapter.title || ''}" onchange="app.updateSynopsisTitle('${chapter.id}', this.value)">
                         <button onclick="app.removeSynopsisChapter('${chapter.id}')" class="text-red-500 hover:text-red-700 p-1.5">
                             <i class="fa-solid fa-trash text-xs"></i>
                         </button>
                     </div>
                     <div class="p-3">
+                        ${imageSection}
+                        <div class="flex gap-2 mb-3">
+                            <label class="flex-1 cursor-pointer bg-gray-100 hover:bg-gray-200 rounded-lg p-2 text-center text-xs text-gray-600 transition">
+                                <i class="fa-solid fa-image mr-1"></i>选择图片
+                                <input type="file" class="hidden" accept="image/*" onchange="app.uploadSynopsisImage('${chapter.id}', this)">
+                            </label>
+                        </div>
                         <textarea class="w-full p-2 border border-gray-200 rounded-lg text-sm resize-none" rows="4"
                             onchange="app.updateSynopsisContent('${chapter.id}', this.value)">${chapter.content || ''}</textarea>
                     </div>
@@ -1023,17 +1068,94 @@ Object.assign(window.app, {
             });
         }
     },
+    // 【新增】上传剧情梗概图片
+    async uploadSynopsisImage(chapterId, input) {
+        const file = input.files[0];
+        if (!file) return;
+        
+        try {
+            // 转换为 base64
+            const dataUrl = await new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => resolve(e.target.result);
+                reader.readAsDataURL(file);
+            });
+            
+            // 压缩
+            const compressed = await this.compressImageIfNeeded(dataUrl, 1920, 1080, 0.85, 2);
+            
+            // 生成文件名
+            const filename = `synopsis-${chapterId}-${Date.now()}.jpg`;
+            
+            // 上传
+            await this.githubStorage.saveImage(filename, compressed);
+            
+            // 更新数据
+            const chapter = this.data.synopsis.find(s => s.id === chapterId);
+            if (chapter) {
+                chapter.image = `{{IMG:${filename}}}`;
+                // 立即解析为URL以便显示
+                const { owner, repo, branch, dataPath } = this.githubStorage.config;
+                chapter.image = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}/images/${filename}`;
+            }
+            
+            // 保存并刷新
+            await this.saveData();
+            this.renderSynopsisEdit(document.getElementById('main-container'));
+            this.showToast('图片上传成功', 'success');
+            
+        } catch (e) {
+            this.showToast('图片上传失败: ' + e.message, 'error');
+        }
+        
+        input.value = '';
+    },
+
+    // 【新增】删除剧情梗概图片
+    async removeSynopsisImage(chapterId) {
+        const confirmed = await this.showConfirmDialog({
+            title: '删除确认',
+            message: '确定删除此章节的图片？',
+            confirmText: '删除',
+            cancelText: '取消',
+            type: 'warning'
+        });
+        
+        if (confirmed) {
+            const chapter = this.data.synopsis.find(s => s.id === chapterId);
+            if (chapter) {
+                chapter.image = null;
+                await this.saveData();
+                this.renderSynopsisEdit(document.getElementById('main-container'));
+            }
+        }
+    },
 
     syncSynopsisWithChapters() {
-        const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
+        // 如果 synopsis 为空，初始化
+        if (!this.data.synopsis) {
+            this.data.synopsis = [];
+        }
+        
+        // 构建现有剧情梗概映射（用于快速查找）
         const existingSynopsis = {};
-        this.data.synopsis.forEach(s => { existingSynopsis[s.chapterId] = s; });
-
+        this.data.synopsis.forEach(s => { 
+            if (s.chapterId) existingSynopsis[s.chapterId] = s; 
+        });
+        
+        const sortedChapters = [...this.data.chapters].sort((a, b) => a.order - b.order);
         const newSynopsis = [];
+        
         sortedChapters.forEach(ch => {
             if (existingSynopsis[ch.id]) {
-                newSynopsis.push(existingSynopsis[ch.id]);
+                // 【关键】保留现有剧情梗概（包括导入的内容和图片）
+                const existing = existingSynopsis[ch.id];
+                // 更新章节基本信息（编号、标题可能变化）
+                existing.num = ch.num;
+                existing.title = existing.title || ch.title || `第${ch.num}章`;
+                newSynopsis.push(existing);
             } else {
+                // 新建空的剧情梗概
                 newSynopsis.push({
                     id: 'syn-' + Date.now() + '-' + Math.random().toString(36).substr(2, 5),
                     chapterId: ch.id,
@@ -1044,6 +1166,7 @@ Object.assign(window.app, {
                 });
             }
         });
+        
         this.data.synopsis = newSynopsis;
     },
 
@@ -1853,8 +1976,73 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                 welcomeSubtitle: importedData.welcomeSubtitle
             };
             this.data.settings = { ...this.data.settings, ...settings };
-            this.data.chapters = importedData.chapters || importedData.data?.chapters || this.data.chapters;
-            this.data.camps = importedData.camps || importedData.data?.camps || this.data.camps;
+            
+            // 【关键修复】正确合并 chapters（保留顺序）
+            const importedChapters = importedData.chapters || importedData.data?.chapters || [];
+            if (mode === 'replace') {
+                this.data.chapters = importedChapters;
+            } else {
+                // 合并模式：保留现有，添加新的（按id去重）
+                const existingIds = new Set(this.data.chapters.map(c => c.id));
+                importedChapters.forEach(ch => {
+                    if (!existingIds.has(ch.id)) {
+                        this.data.chapters.push(ch);
+                    } else {
+                        // 更新现有章节信息
+                        const idx = this.data.chapters.findIndex(c => c.id === ch.id);
+                        if (idx >= 0) {
+                            this.data.chapters[idx] = { ...this.data.chapters[idx], ...ch };
+                        }
+                    }
+                });
+            }
+            
+            // 【关键修复】正确合并 synopsis（保留内容和图片）
+            const importedSynopsis = importedData.synopsis || importedData.data?.synopsis || [];
+            if (mode === 'replace') {
+                this.data.synopsis = importedSynopsis;
+            } else {
+                // 合并模式：保留现有，添加新的（按chapterId去重，保留内容）
+                const existingSynMap = {};
+                this.data.synopsis.forEach(s => { if(s.chapterId) existingSynMap[s.chapterId] = s; });
+                
+                importedSynopsis.forEach(syn => {
+                    if (!syn.chapterId) return; // 跳过无效数据
+                    
+                    if (!existingSynMap[syn.chapterId]) {
+                        // 新增
+                        this.data.synopsis.push(syn);
+                        existingSynMap[syn.chapterId] = syn;
+                    } else {
+                        // 【关键】更新时保留非空内容（避免覆盖已有内容）
+                        const existing = existingSynMap[syn.chapterId];
+                        if (syn.content && syn.content.trim()) {
+                            existing.content = syn.content; // 导入的内容优先
+                        }
+                        if (syn.image && syn.image.startsWith('{{IMG:')) {
+                            existing.image = syn.image; // 更新图片引用
+                        }
+                        if (syn.title && syn.title.trim()) {
+                            existing.title = syn.title;
+                        }
+                    }
+                });
+            }
+            
+            // 合并其他数据
+            const mergeArray = (target, source, key = 'id') => {
+                if (!source) return;
+                const existing = new Set(target.map(i => i[key]));
+                source.forEach(item => {
+                    if (!existing.has(item[key])) target.push(item);
+                });
+            };
+            
+            mergeArray(this.data.camps, importedData.camps || importedData.data?.camps);
+            mergeArray(this.data.announcements, importedData.announcements || importedData.data?.announcements);
+            
+            // 【关键】导入后重新同步剧情梗概与章节（确保结构完整）
+            this.syncSynopsisWithChapters();
         }
 
         // 步骤 5: 分片配置（保存到不同文件，避免409）
