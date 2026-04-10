@@ -1190,13 +1190,12 @@ Object.assign(window.app, {
             el.classList.toggle('hidden', this.runMode !== 'backend');
         });
         
-        // 【关键修改】获取当前时间节点过滤后的条目
+        // 获取当前时间节点过滤后的条目
         let items = this.getFilteredEntriesByTimeline(type);
         
         if (countBadge) countBadge.textContent = items.length;
         
         if (items.length === 0) {
-            // 【新增】如果是时间轴过滤导致为空，显示提示
             const currentNode = this.getCurrentNode();
             if (currentNode && this.runMode === 'frontend') {
                 masonry.innerHTML = `
@@ -1214,24 +1213,23 @@ Object.assign(window.app, {
         } else {
             // 按重要程度和置顶排序
             items.sort((a, b) => {
-                // 置顶版本优先
-                const aPinned = a._isPinned ? 0 : 1;
-                const bPinned = b._isPinned ? 0 : 1;
+                const aPinned = a.isPinned ? 0 : 1;
+                const bPinned = b.isPinned ? 0 : 1;
                 if (aPinned !== bPinned) return aPinned - bPinned;
                 
-                // 然后按重要程度
-                const vA = this.getVisibleVersion(a.entry || a);
-                const vB = this.getVisibleVersion(b.entry || b);
+                const vA = a.version || this.getVisibleVersion(a.entry || a);
+                const vB = b.version || this.getVisibleVersion(b.entry || b);
                 return (vA?.level || 5) - (vB?.level || 5);
             });
             
             items.forEach(item => {
-                // item 可能是 {entry, version, isPinned} 或原始 entry
                 const entry = item.entry || item;
                 const version = item.version || this.getVisibleVersion(entry);
                 
                 if (version) {
-                    const card = this.createEntryCard(entry, version, item.isPinned);
+                    // 【关键修复】确保传递布尔值，避免 undefined
+                    const pinFlag = !!item.isPinned;
+                    const card = this.createEntryCard(entry, version, pinFlag);
                     if (card) masonry.appendChild(card);
                 }
             });
@@ -2297,14 +2295,14 @@ Object.assign(window.app, {
 
     // ========== 词条操作 ==========
     // 【替换 createEntryCard 函数】增强版，支持实时解析和错误处理
-    createEntryCard(entry, version) {
+    createEntryCard(entry, version, pinnedFlag = false) {
         const div = document.createElement('div');
         div.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 active:scale-95 flex flex-col w-3/4 mx-auto';
         div.onclick = () => this.openEntry(entry.id);
         
-        // 【新增】重要程度计算（1级=5星，5级=1星）
+        // 计算重要程度星级
         const level = version.level || 5;
-        const starCount = 6 - level; // 1级→5星，5级→1星
+        const starCount = 6 - level;
         const levelStars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
         const levelColor = level <= 2 ? 'text-amber-500' : (level === 3 ? 'text-blue-500' : 'text-gray-400');
         
@@ -2320,8 +2318,10 @@ Object.assign(window.app, {
         }
         
         const hasImage = typeof imgUrl === 'string' && imgUrl.startsWith('http');
-        // 【新增】如果是置顶版本，添加标记
-        const pinnedBadge = isPinned ? 
+        
+        // 【关键修复】使用 pinnedFlag 参数（避免 undefined 问题）
+        const isPinnedVersion = !!pinnedFlag;
+        const pinnedBadge = isPinnedVersion ? 
             `<div class="absolute top-2 left-2 z-20 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded font-bold shadow-sm">
                 <i class="fa-solid fa-thumbtack mr-1"></i>推荐
             </div>` : '';
@@ -2329,7 +2329,6 @@ Object.assign(window.app, {
         div.innerHTML = `
             <div class="relative aspect-[3/4] overflow-hidden bg-gray-100 shrink-0">
                 ${pinnedBadge}
-                <!-- 【新增】重要程度角标（右上角） -->
                 <div class="absolute top-2 right-2 z-20 ${levelColor} text-xs font-bold bg-white/90 backdrop-blur px-1.5 py-0.5 rounded shadow-sm border border-gray-100" title="重要程度：Lv.${level}">
                     ${levelStars}
                 </div>
@@ -2345,7 +2344,6 @@ Object.assign(window.app, {
                     <div class="text-white font-bold text-sm truncate">${version.title || '未命名'}</div>
                     <div class="text-white/80 text-xs font-mono truncate flex justify-between items-center">
                         <span>${entry.code}</span>
-                        <!-- 【新增】等级数字显示 -->
                         <span class="text-[10px] opacity-90 bg-black/30 px-1.5 rounded">Lv.${level}</span>
                     </div>
                 </div>
