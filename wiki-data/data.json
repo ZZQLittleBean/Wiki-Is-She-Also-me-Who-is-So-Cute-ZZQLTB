@@ -3903,7 +3903,17 @@
       "image": null
     }
   ],
-  "announcements": [],
+  "announcements": [
+    {
+      "id": "ann-1775817559877",
+      "title": "ZZQ小豆同学的小说Wiki GitHub Pages版本v2.6测试公告",
+      "author": "ZZQ小豆同学",
+      "content": "当前Wiki的GitHub Pages版本已可正常访问，读者可自由查询ZZQ小豆同学作品中的相关内容。\n当前版本内容不完整，请读者耐心等待新内容更新。\n4.10",
+      "createdAt": 1775817559877,
+      "date": "2026/4/10",
+      "isActive": true
+    }
+  ],
   "currentTimeline": "latest",
   "currentMode": "view",
   "editingId": null,
@@ -3928,6 +3938,7 @@
     "customFont": "'Noto Sans SC', sans-serif",
     "homeCustomTitle": "首页自定义内容"
   },
+  "currentAnnouncement": null,
   "version": "2.7.0-atomic",
-  "lastUpdate": 1775811722547
+  "lastUpdate": 1775817559910
 }
