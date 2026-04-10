@@ -1055,7 +1055,7 @@ Object.assign(window.app, {
         container.appendChild(clone);
     },
 
-    // 【完整替换】renderDetail 函数 - 最终修复版
+    // 【完整替换】renderDetail 函数 - 修复换行显示和角色引用
     renderDetail(container) {
         const entry = this.data.entries.find(e => e.id === this.data.editingId);
         if (!entry) {
@@ -1083,7 +1083,7 @@ Object.assign(window.app, {
         
         const contentEl = clone.getElementById('detail-content');
         
-        // 【关键修复】构建 GitHub Raw URL 基础路径
+        // 构建 GitHub Raw URL 基础路径
         let baseUrl = '';
         if (this.githubStorage?.config?.owner) {
             const { owner, repo, branch, dataPath } = this.githubStorage.config;
@@ -1091,51 +1091,48 @@ Object.assign(window.app, {
             baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${safeDataPath}/images/`;
         }
         
-        // 【关键修复】防御性获取并实时解析图片 URL
+        // 防御性获取并实时解析图片 URL
         let imgUrl = '';
         const rawImg = version.images?.card || version.images?.avatar || version.image || '';
         
         if (typeof rawImg === 'string') {
-            // 场景1: 已是完整 URL
             if (rawImg.startsWith('http')) {
                 imgUrl = rawImg;
-            }
-            // 场景2: 需要解析 {{IMG:filename}} 格式
-            else if (rawImg.includes('{{IMG:')) {
+            } else if (rawImg.includes('{{IMG:')) {
                 const match = rawImg.match(/\{\{IMG:\s*([^}]+)\s*\}\}/);
                 if (match && match[1]) {
                     let filename = match[1].trim();
-                    
-                    // 【长期防护】自动修复截断的扩展名
-                    if (filename.endsWith('.jp') && !filename.endsWith('.jpg')) {
-                        filename += 'g';
-                        console.warn(`[Detail] 修复截断: ${entry.code} .jp -> .jpg`);
-                    }
+                    if (filename.endsWith('.jp') && !filename.endsWith('.jpg')) filename += 'g';
                     if (filename.endsWith('.jpe')) filename += 'g';
                     if (filename.endsWith('.pn')) filename += 'g';
-                    
                     imgUrl = baseUrl + encodeURIComponent(filename);
-                    console.log(`[Detail] 实时解析: ${entry.code} -> ${filename}`);
                 }
             }
         }
         
-        // 【长期防护】最终检查：如果 URL 以 .jp 结尾（解析后截断），强制补全
         if (imgUrl && imgUrl.endsWith('.jp') && !imgUrl.endsWith('.jpg')) {
             imgUrl = imgUrl + 'g';
-            console.warn(`[Detail] 修复 URL 截断: ${entry.code}`);
         }
         
-        // 渲染内容头部
+        // 【新增】重要程度标签样式
+        const level = version.level || 5;
+        const levelClass = level <= 2 ? 'bg-amber-100 text-amber-700' : (level === 3 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600');
+        
+        // 渲染内容头部（【修改】添加等级标签）
         let contentHtml = `
             <div class="flex flex-col md:flex-row gap-6 mb-6">
                 <div class="flex-1">
-                    <h1 class="text-3xl font-bold text-gray-900 mb-3">${version.title || '未命名'}</h1>
+                    <div class="flex items-center gap-3 mb-3 flex-wrap">
+                        <h1 class="text-3xl font-bold text-gray-900">${version.title || '未命名'}</h1>
+                        <!-- 【新增】重要程度标签 -->
+                        <span class="px-2.5 py-1 rounded-full text-xs font-bold ${levelClass} border border-current opacity-80" title="重要程度等级">
+                            Lv.${level}
+                        </span>
+                    </div>
                     ${version.subtitle ? `<p class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4">${version.subtitle}</p>` : ''}
                 </div>
         `;
         
-        // 【关键修复】只有获取到有效 HTTP URL 才显示图片，并添加错误处理
         if (imgUrl && imgUrl.startsWith('http')) {
             contentHtml += `
                 <div class="w-48 shrink-0">
@@ -1144,10 +1141,7 @@ Object.assign(window.app, {
                             class="w-full h-full object-cover" 
                             alt="${version.title || entry.code}" 
                             crossorigin="anonymous"
-                            onerror="console.error('[Detail Image Error] 加载失败:', this.src, '条目:', '${entry.code}'); 
-                                    this.onerror=null; 
-                                    this.style.display='none'; 
-                                    this.parentElement.innerHTML='<div class=\'flex flex-col items-center justify-center w-full h-full bg-gray-50 text-gray-400\'><i class=\'fa-solid fa-image text-4xl mb-2\'></i><span class=\'text-xs\'>图片加载失败</span></div>';">
+                            onerror="this.onerror=null; this.style.display='none'; this.parentElement.innerHTML='<div class=\'flex flex-col items-center justify-center w-full h-full bg-gray-50 text-gray-400\'><i class=\'fa-solid fa-image text-4xl mb-2\'></i><span class=\'text-xs\'>图片加载失败</span></div>';">
                     </div>
                 </div>
             `;
@@ -1155,7 +1149,7 @@ Object.assign(window.app, {
         
         contentHtml += '</div>';
         
-        // 正文块渲染
+        // 【关键修改】正文块渲染（支持换行和HTML格式）
         contentHtml += '<div class="prose prose-sm max-w-none">';
         if (version.blocks && version.blocks.length > 0) {
             version.blocks.forEach(block => {
@@ -1165,8 +1159,17 @@ Object.assign(window.app, {
                     contentHtml += `<h3 class="text-lg font-bold text-gray-700 mt-6 mb-3">${block.text || ''}</h3>`;
                 } else {
                     let text = block.text || '';
+                    
+                    // 【新增】转义HTML防止XSS，但保留允许的格式标签
+                    text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    // 恢复允许的HTML标签（b, i, u, br）
+                    text = text.replace(/&lt;(b|i|u|br)\s*\/?&gt;/g, '<$1>');
+                    text = text.replace(/&lt;\/(b|i|u)&gt;/g, '</$1>');
+                    // 【关键】处理换行符
+                    text = text.replace(/\n/g, '<br>');
                     // 处理内部链接 [[...]]
                     text = text.replace(/\[\[(.*?)\]\]/g, '<a href="#" onclick="app.searchAndOpen(\'$1\'); return false;" class="text-indigo-600 hover:underline">$1</a>');
+                    
                     contentHtml += `<p class="text-gray-600 leading-relaxed mb-4 break-all">${text}</p>`;
                 }
             });
@@ -1175,7 +1178,7 @@ Object.assign(window.app, {
         }
         contentHtml += '</div>';
         
-        // 版本切换（如果有多个版本）
+        // 版本切换
         if (entry.versions.length > 1) {
             contentHtml += `
                 <div class="mt-8 pt-6 border-t border-gray-200">
@@ -1184,10 +1187,12 @@ Object.assign(window.app, {
             `;
             entry.versions.forEach((v, idx) => {
                 const isCurrent = v.vid === version.vid;
+                const vLevel = v.level || 5;
                 contentHtml += `
                     <button onclick="app.switchToVersion('${entry.id}', '${v.vid}')" 
-                        class="px-3 py-1.5 rounded-lg text-sm ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}">
+                        class="px-3 py-1.5 rounded-lg text-sm ${isCurrent ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'} flex items-center gap-1">
                         版本 ${idx + 1}: ${v.title || '未命名'}
+                        <span class="text-[10px] opacity-70 ml-1">Lv.${vLevel}</span>
                     </button>
                 `;
             });
@@ -1196,6 +1201,28 @@ Object.assign(window.app, {
         
         contentEl.innerHTML = contentHtml;
         container.appendChild(clone);
+    },
+
+    // 【新增】解析角色引用格式 @姓名[编号] → 蓝色标签
+    parseCharacterReferences(text) {
+        if (!text) return '';
+        // 匹配 @姓名[编号] 格式，转换为蓝色标签
+        return text.replace(/@([^[\n]+?)\\[([A-Z]-\\d+)\\]/g, (match, name, code) => {
+            // 查找对应条目
+            const entry = this.data.entries.find(e => e.code === code);
+            const entryId = entry ? entry.id : '';
+            return `<span class="character-reference-tag" data-entry-id="${entryId}" data-code="${code}" onclick="app.openEntryByCode('${code}')">${name}</span>`;
+        });
+    },
+
+    // 【新增】通过编号打开条目
+    openEntryByCode(code) {
+        const entry = this.data.entries.find(e => e.code === code);
+        if (entry) {
+            this.openEntry(entry.id);
+        } else {
+            this.showToast('未找到该角色', 'warning');
+        }
     },
 
     renderEdit(container) {
@@ -1257,6 +1284,29 @@ Object.assign(window.app, {
         const titleInput = clone.getElementById('edit-title');
         const codeInput = clone.getElementById('edit-code');
         const subtitleInput = clone.getElementById('edit-subtitle');
+        const levelSelect = document.getElementById('edit-level');
+        const levelPreview = document.getElementById('level-preview');
+        if (levelSelect) {
+            // 设置当前值
+            levelSelect.value = this.tempVersion.level || 5;
+            
+            // 更新星级预览函数
+            const updatePreview = () => {
+                const level = parseInt(levelSelect.value);
+                const stars = '★'.repeat(6 - level) + '☆'.repeat(level - 1);
+                if (levelPreview) levelPreview.textContent = stars;
+            };
+            
+            // 初始化预览
+            updatePreview();
+            
+            // 监听变化
+            levelSelect.onchange = () => {
+                this.tempVersion.level = parseInt(levelSelect.value);
+                updatePreview();
+                this.editState.hasChanges = true;
+            };
+        }
         
         if (titleInput) titleInput.value = this.tempVersion.title;
         if (codeInput) codeInput.value = this.tempEntry.code;
@@ -1267,7 +1317,42 @@ Object.assign(window.app, {
         
         container.appendChild(clone);
     },
-
+    insertFormat(tag) {
+        const subtitleInput = document.getElementById('edit-subtitle');
+        if (!subtitleInput) return;
+        
+        const start = subtitleInput.selectionStart;
+        const end = subtitleInput.selectionEnd;
+        const text = subtitleInput.value;
+        const before = text.substring(0, start);
+        const selected = text.substring(start, end);
+        const after = text.substring(end);
+        
+        let insertText = '';
+        if (tag === 'br') {
+            insertText = '\n';
+            subtitleInput.value = before + insertText + after;
+            subtitleInput.selectionStart = subtitleInput.selectionEnd = start + 1;
+        } else {
+            insertText = `<${tag}>${selected}</${tag}>`;
+            subtitleInput.value = before + insertText + after;
+            subtitleInput.selectionStart = start;
+            subtitleInput.selectionEnd = start + insertText.length;
+        }
+        
+        subtitleInput.focus();
+        this.tempVersion.subtitle = subtitleInput.value;
+        this.editState.hasChanges = true;
+    },
+    
+    // 添加帮助对话框
+    showHelpDialog() {
+        this.showAlertDialog({
+            title: '格式帮助',
+            message: '题记支持以下HTML标签：\n\n<b>粗体</b>\n<i>斜体</i>\n<u>下划线</u>\n<br>换行\n\n示例：<b>强调文字</b>',
+            type: 'info'
+        });
+    },
     renderSettings(container) {
         const tpl = document.getElementById('tpl-settings');
         if (!tpl) return;
@@ -1304,16 +1389,13 @@ Object.assign(window.app, {
         const clone = tpl.content.cloneNode(true);
         container.appendChild(clone);
         
-        // 【注意】不再在这里调用 syncSynopsisWithChapters，避免覆盖数据
-        // 数据应该在加载/导入时已经同步好
-        
         const list = document.getElementById('synopsis-view-list');
         if (list) {
             this.data.synopsis.forEach(chapter => {
                 const item = document.createElement('div');
                 item.className = 'synopsis-chapter-item p-6 border-b border-gray-200';
                 
-                // 【新增】构建图片HTML（如果有）
+                // 构建图片HTML（如果有）
                 let imageHtml = '';
                 if (chapter.image && chapter.image.startsWith('http')) {
                     imageHtml = `
@@ -1323,14 +1405,39 @@ Object.assign(window.app, {
                     `;
                 }
                 
+                // 【关键修改】内容处理：支持@姓名[编号]格式和换行
+                let content = chapter.content || '';
+                
+                // 【新增】解析 @姓名[编号] 格式 → 图3样式标签
+                content = content.replace(/@([^\[\]]+)\[([A-Z]-\d{3})\]/g, (match, name, code) => {
+                    // 查找对应条目
+                    const entry = this.data.entries.find(e => e.code === code);
+                    if (entry) {
+                        return `<span class="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md text-sm font-medium cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onclick="app.openEntry('${entry.id}')">
+                            <i class="fa-solid fa-user text-xs text-indigo-500"></i>
+                            <span class="font-semibold">${name}</span>
+                            <span class="text-indigo-400 text-xs font-mono bg-white/50 px-1 rounded">${code}</span>
+                        </span>`;
+                    }
+                    // 未找到条目时保持原样显示
+                    return match;
+                });
+                
+                // 【新增】处理换行符（必须在HTML转换后执行，避免破坏标签）
+                content = content.replace(/\n/g, '<br>');
+                
+                // 【新增】支持基础HTML格式（同renderDetail）
+                content = content.replace(/&lt;(b|i|u|br)\s*\/?&gt;/g, '<$1>');
+                content = content.replace(/&lt;\/(b|i|u)&gt;/g, '</$1>');
+                
                 item.innerHTML = `
-                    <h3 class="text-xl font-bold text-gray-800 mb-3">
-                        <span class="text-indigo-600 mr-2">${this.formatChapterNum(chapter.num)}</span>
-                        ${chapter.title || `第${chapter.num}章`}
+                    <h3 class="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <span class="bg-indigo-600 text-white text-sm px-2 py-1 rounded-md font-mono">${this.formatChapterNum(chapter.num)}</span>
+                        <span>${chapter.title || `第${chapter.num}章`}</span>
                     </h3>
                     ${imageHtml}
-                    <div class="prose prose-sm max-w-none text-gray-600">
-                        ${chapter.content ? chapter.content.replace(/\n/g, '<br>') : '<p class="text-gray-400 italic">暂无内容</p>'}
+                    <div class="prose prose-sm max-w-none text-gray-600 leading-relaxed">
+                        ${content ? content : '<p class="text-gray-400 italic">暂无内容</p>'}
                     </div>
                 `;
                 list.appendChild(item);
@@ -1933,15 +2040,20 @@ Object.assign(window.app, {
 
     // ========== 词条操作 ==========
     // 【替换 createEntryCard 函数】增强版，支持实时解析和错误处理
-        createEntryCard(entry, version) {
+    createEntryCard(entry, version) {
         const div = document.createElement('div');
         div.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 active:scale-95 flex flex-col w-3/4 mx-auto';
         div.onclick = () => this.openEntry(entry.id);
         
-        // 【关键】实时获取并解析图片 URL（防御性）
+        // 【新增】重要程度计算（1级=5星，5级=1星）
+        const level = version.level || 5;
+        const starCount = 6 - level; // 1级→5星，5级→1星
+        const levelStars = '★'.repeat(starCount) + '☆'.repeat(5 - starCount);
+        const levelColor = level <= 2 ? 'text-amber-500' : (level === 3 ? 'text-blue-500' : 'text-gray-400');
+        
+        // 实时获取并解析图片 URL
         let imgUrl = version.images?.card || version.images?.avatar || version.image || '';
         
-        // 如果仍是 {{IMG:...}} 格式（预解析失效），实时转换
         if (typeof imgUrl === 'string' && imgUrl.includes('{{IMG:')) {
             const match = imgUrl.match(/\{\{IMG:\s*([^}]+)\s*\}\}/);
             if (match && this.githubStorage?.config?.owner) {
@@ -1950,11 +2062,15 @@ Object.assign(window.app, {
             }
         }
         
-        // 检查是否为有效 HTTP 链接
         const hasImage = typeof imgUrl === 'string' && imgUrl.startsWith('http');
         
         div.innerHTML = `
             <div class="relative aspect-[3/4] overflow-hidden bg-gray-100 shrink-0">
+                <!-- 【新增】重要程度角标（右上角） -->
+                <div class="absolute top-2 right-2 z-20 ${levelColor} text-xs font-bold bg-white/90 backdrop-blur px-1.5 py-0.5 rounded shadow-sm border border-gray-100" title="重要程度：Lv.${level}">
+                    ${levelStars}
+                </div>
+                
                 ${hasImage ? 
                     `<img src="${imgUrl}" 
                         class="w-full h-full object-cover transition-transform duration-500 hover:scale-110" 
@@ -1964,7 +2080,11 @@ Object.assign(window.app, {
                 }
                 <div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 pt-8">
                     <div class="text-white font-bold text-sm truncate">${version.title || '未命名'}</div>
-                    <div class="text-white/80 text-xs font-mono truncate">${entry.code}</div>
+                    <div class="text-white/80 text-xs font-mono truncate flex justify-between items-center">
+                        <span>${entry.code}</span>
+                        <!-- 【新增】等级数字显示 -->
+                        <span class="text-[10px] opacity-90 bg-black/30 px-1.5 rounded">Lv.${level}</span>
+                    </div>
                 </div>
             </div>
             <div class="p-3 flex-1 flex flex-col justify-between min-h-[60px]">
@@ -2014,6 +2134,7 @@ Object.assign(window.app, {
         
         this.tempVersion.title = document.getElementById('edit-title')?.value?.trim() || '';
         this.tempVersion.subtitle = document.getElementById('edit-subtitle')?.value?.trim() || '';
+        this.tempVersion.level = parseInt(document.getElementById('edit-level')?.value || 5);
         
         if (!this.tempVersion.title) {
             this.showAlertDialog({
