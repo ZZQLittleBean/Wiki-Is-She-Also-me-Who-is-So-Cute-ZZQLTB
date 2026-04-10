@@ -2563,7 +2563,48 @@ async saveDataSimple(progress = null) {
         return { success: false, error: error.message };
     }
 },
-
+// 【添加到 app 对象】数据修复工具
+fixData: async function() {
+    console.log('[Fix] 开始数据修复...');
+    
+    // 1. 重新解析所有图片引用
+    console.log('[Fix] 重新解析图片引用...');
+    this.resolveImageReferences();
+    
+    // 2. 同步剧情梗概
+    console.log('[Fix] 同步剧情梗概...');
+    this.syncSynopsisWithChapters();
+    
+    // 3. 检查条目完整性
+    let brokenEntries = 0;
+    this.data.entries.forEach(entry => {
+        if (!entry.versions || entry.versions.length === 0) {
+            brokenEntries++;
+            console.warn(`[Fix] 发现无版本条目: ${entry.id}`);
+        }
+    });
+    
+    // 4. 保存修复后的数据
+    console.log('[Fix] 保存修复结果...');
+    try {
+        await this.saveDataAtomic();
+        console.log('[Fix] ✅ 修复完成并已保存');
+        this.showToast('数据修复完成', 'success');
+        
+        // 刷新页面显示
+        this.router('home');
+    } catch (e) {
+        console.error('[Fix] 保存失败:', e);
+        this.showToast('修复保存失败: ' + e.message, 'error');
+    }
+    
+    return {
+        entries: this.data.entries.length,
+        homeContent: this.data.homeContent.length,
+        synopsis: this.data.synopsis.length,
+        brokenEntries: brokenEntries
+    };
+},
 // 【新增】检查并恢复导入进度（页面加载时调用）
 checkImportResume: async function() {
     const saved = localStorage.getItem('wiki_import_progress');
