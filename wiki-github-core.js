@@ -1227,9 +1227,9 @@ Object.assign(window.app, {
                 const version = item.version || this.getVisibleVersion(entry);
                 
                 if (version) {
-                    // 【关键修复】确保传递布尔值，避免 undefined
-                    const pinFlag = !!item.isPinned;
-                    const card = this.createEntryCard(entry, version, pinFlag);
+                    // 【关键】确保传递布尔值给 isPinned 参数
+                    const pinStatus = !!item.isPinned;
+                    const card = this.createEntryCard(entry, version, pinStatus);
                     if (card) masonry.appendChild(card);
                 }
             });
@@ -1268,7 +1268,6 @@ Object.assign(window.app, {
                         entry: entry,
                         version: version,
                         isPinned: nodeEntry.pinned,
-                        _isPinned: nodeEntry.pinned // 内部标记
                     });
                 }
             }
@@ -2295,7 +2294,7 @@ Object.assign(window.app, {
 
     // ========== 词条操作 ==========
     // 【替换 createEntryCard 函数】增强版，支持实时解析和错误处理
-    createEntryCard(entry, version, pinnedFlag = false) {
+    createEntryCard(entry, version, isPinned = false) {
         const div = document.createElement('div');
         div.className = 'bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden cursor-pointer hover:shadow-lg transition-all duration-300 active:scale-95 flex flex-col w-3/4 mx-auto';
         div.onclick = () => this.openEntry(entry.id);
@@ -2319,9 +2318,9 @@ Object.assign(window.app, {
         
         const hasImage = typeof imgUrl === 'string' && imgUrl.startsWith('http');
         
-        // 【关键修复】使用 pinnedFlag 参数（避免 undefined 问题）
-        const isPinnedVersion = !!pinnedFlag;
-        const pinnedBadge = isPinnedVersion ? 
+        // 【关键】确保 isPinned 是布尔值，避免 undefined
+        const showPin = !!isPinned;
+        const pinnedBadge = showPin ? 
             `<div class="absolute top-2 left-2 z-20 bg-amber-500 text-white text-[10px] px-2 py-0.5 rounded font-bold shadow-sm">
                 <i class="fa-solid fa-thumbtack mr-1"></i>推荐
             </div>` : '';
@@ -2355,6 +2354,7 @@ Object.assign(window.app, {
         
         return div;
     },
+
 
     openEntry(id) {
         this.data.editingId = id;
