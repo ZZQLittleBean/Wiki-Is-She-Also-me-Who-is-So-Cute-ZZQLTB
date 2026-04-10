@@ -1,6 +1,6 @@
 {
-  "version": "2.7.0-sharded-import",
-  "lastUpdate": 1775798236349,
+  "version": "2.7.0-sharded",
+  "lastUpdate": 1775798357021,
   "totalEntries": 74,
   "entryFiles": [
     "entries-0.json",
@@ -622,6 +622,6 @@
   "announcements": [],
   "homeContent": [],
   "customFields": {},
-  "importInProgress": true,
+  "importCompleted": true,
   "entries": []
 }
