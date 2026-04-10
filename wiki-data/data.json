@@ -1,6 +1,6 @@
 {
-  "version": "2.7.0-sharded",
-  "lastUpdate": 1775796543444,
+  "version": "2.7.0-sharded-import",
+  "lastUpdate": 1775797549224,
   "totalEntries": 74,
   "entryFiles": [
     "entries-0.json",
@@ -281,10 +281,347 @@
     "⌈茶室⌋",
     "同学组A"
   ],
-  "synopsis": [],
+  "synopsis": [
+    {
+      "id": "syn-1775797532726-c86l7",
+      "chapterId": "ch-1774186885948-9q0x2",
+      "num": "0.1",
+      "title": "0.0 凝滞的虚影 & 0.1 幕影之后",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-d4rko",
+      "chapterId": "ch-1774186885948-1q7ip",
+      "num": "1.1",
+      "title": "0.1 田螺姑娘，真的假的？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-falu7",
+      "chapterId": "ch-1774186885948-mhej7",
+      "num": "1.2",
+      "title": "1.2 孙小孙的妙（gui）计",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-2vh9u",
+      "chapterId": "ch-1774186885948-aaljk",
+      "num": "1.3",
+      "title": "1.3 田螺姑娘的真相，没想到是自己干的？！",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-3fk5a",
+      "chapterId": "ch-1774186885948-ox5fl",
+      "num": "1.4",
+      "title": "1.4 另一个我的突然出现",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-spgha",
+      "chapterId": "ch-1774186885948-ata9e",
+      "num": "1.5",
+      "title": "1.5 张可颂这个名字，喜不喜欢？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-n9sn1",
+      "chapterId": "ch-1774186885948-heulp",
+      "num": "1.6",
+      "title": "1.6 元气米线，祝好胃口......？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-qslbq",
+      "chapterId": "ch-1774186885948-n43hg",
+      "num": "1.7",
+      "title": "1.7 卧榻上的浮想联翩",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-g4p89",
+      "chapterId": "ch-1774186885948-o6muc",
+      "num": "2.1",
+      "title": "2.1 不得不迈出的第一步",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-7n3xm",
+      "chapterId": "ch-1774186885948-x95lv",
+      "num": "2.2",
+      "title": "2.2 就让我们一起来面对吧",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-x29g2",
+      "chapterId": "ch-1774186885948-vqqhl",
+      "num": "2.3",
+      "title": "2.3 或许，我还是那个你最熟悉的人呢？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-0ag1w",
+      "chapterId": "ch-1774186885948-ync1n",
+      "num": "2.4",
+      "title": "2.4 ......别怕，我一直在哦♡",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-nglxo",
+      "chapterId": "ch-1774186885948-t51s2",
+      "num": "2.5",
+      "title": "2.5 我知道一个信得过的人  ˶╹ꇴ╹˶",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-auc13",
+      "chapterId": "ch-1774186885948-jypi3",
+      "num": "2.6",
+      "title": "2.6 马大钊的完美心理教室......？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-xnr74",
+      "chapterId": "ch-1774186885948-v4jlr",
+      "num": "2.7",
+      "title": "2.7 向松松理解不能宕机实录",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-8cum3",
+      "chapterId": "ch-1774186885948-d6kgi",
+      "num": "2.8",
+      "title": "2.8 当名为“愿意相信”的种子深植心底",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-jskgt",
+      "chapterId": "ch-1774459223566",
+      "num": "2.9",
+      "title": "2.9 匿名信有名有姓",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-u725w",
+      "chapterId": "ch-1774186885948-f6d37",
+      "num": "3.2",
+      "title": "3.2 打麻将的同时还不忘C++（Prizh篇）",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-o46fp",
+      "chapterId": "ch-1774459320512",
+      "num": "4.4",
+      "title": "4.4 开幕式就不要什么乱七八糟的了吧",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-xyjb8",
+      "chapterId": "ch-1774456712953",
+      "num": "4.13",
+      "title": "第四大章-小剧场",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-w0f64",
+      "chapterId": "ch-1774186885948-zbwvr",
+      "num": "5.0*",
+      "title": "5.0* 渐变的身体（孙小孙）",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-qgv44",
+      "chapterId": "ch-1774186885948-7gaqi",
+      "num": "七章中折",
+      "title": "七章中折",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-v9a9y",
+      "chapterId": "ch-1774543469679",
+      "num": "7.9",
+      "title": "7.9 没有颂颂的世界（3/3）",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-hvq48",
+      "chapterId": "ch-1774186885948-fbqoj",
+      "num": "7.10",
+      "title": "7.10 微光映阳平",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-qgv97",
+      "chapterId": "ch-1774186885948-asmjg",
+      "num": "7.10+",
+      "title": "7.10+ 马猴烧酒向日葵（或许是新书预告）",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-22eb3",
+      "chapterId": "ch-1774456921314",
+      "num": "7.11",
+      "title": "7.11 火速烤肉（迫真）",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-oekvq",
+      "chapterId": "ch-1774456955803",
+      "num": "7.12*",
+      "title": "7.12* 张可云的遗忘清单",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-cacqc",
+      "chapterId": "ch-1774186885948-h9zs9",
+      "num": "8.0*",
+      "title": "8.0* 向松松的密录",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-85p38",
+      "chapterId": "ch-1774459973949",
+      "num": "8.??",
+      "title": "8.?? S＊a£i█t█a＋n█i＃c＊",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-kfcc8",
+      "chapterId": "ch-1774459709192",
+      "num": "8.10",
+      "title": "8.10 第八大章 章末总结",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-ylemv",
+      "chapterId": "ch-1774186885948-pgmjy",
+      "num": "Extra002",
+      "title": "Extra002 阿米诺斯！！",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-fpfx2",
+      "chapterId": "ch-1774186885948-08yt2",
+      "num": "10.1",
+      "title": "01 出乎意料的尾杀！",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-4anfj",
+      "chapterId": "ch-1774186885948-plcza",
+      "num": "10.2",
+      "title": "02 塞坦，想必你现在也只能被招安了吧？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-keufx",
+      "chapterId": "ch-1774186885948-29phy",
+      "num": "10.12",
+      "title": "12 向鸿鸿？谁呀？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-6k79w",
+      "chapterId": "ch-1774186885948-e7kbk",
+      "num": "10.15",
+      "title": "15 两位“父亲”的史诗级会（烩）面",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-2hbyo",
+      "chapterId": "ch-1774456873029",
+      "num": "10.23",
+      "title": "23 公司团建开家里来？",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-i0xt9",
+      "chapterId": "ch-1774459438627",
+      "num": "10.26",
+      "title": "26 溶解忆河的清香",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-32j08",
+      "chapterId": "ch-1774459856777",
+      "num": "10.35",
+      "title": "35 孙小孙陈番淑在貔貅大口茶的胜利会师",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-8ce8u",
+      "chapterId": "ch-1774459664526",
+      "num": "10.36",
+      "title": "36 年年欢喜，岁岁好运",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-1n9ig",
+      "chapterId": "ch-1774539804560",
+      "num": "10.37",
+      "title": "37 原先最不可能的两个最后好上了",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-8xwht",
+      "chapterId": "ch-1774344830513",
+      "num": "10.39",
+      "title": "39 记忆自泥瓦中剥离",
+      "content": "",
+      "image": null
+    },
+    {
+      "id": "syn-1775797532726-n8dzh",
+      "chapterId": "ch-1774186885948-7trsu",
+      "num": "10.40",
+      "title": "40 向阳之花终绽放",
+      "content": "",
+      "image": null
+    }
+  ],
   "announcements": [],
   "homeContent": [],
   "customFields": {},
-  "importCompleted": true,
+  "importInProgress": true,
   "entries": []
 }
