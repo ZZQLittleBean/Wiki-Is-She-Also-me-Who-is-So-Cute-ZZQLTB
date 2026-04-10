@@ -354,21 +354,21 @@ Object.assign(window.app, {
                 return;
             }
             
-            console.log('[Wiki] 基础数据加载成功:', baseData.settings?.name || '未命名', '版本:', baseData.version);
+            console.log('[Wiki] 基础数据加载成功:', baseData.settings?.name || '未命名');
             
             // 【关键】检测分片版本
             let entries = [];
             const isSharded = baseData.version && baseData.version.includes('sharded');
             
             if (isSharded && baseData.entryFiles && baseData.entryFiles.length > 0) {
-                console.log('[Wiki] 检测到分片数据，文件列表:', baseData.entryFiles);
+                console.log('[Wiki] 检测到分片数据，开始加载...');
                 entries = await this.loadShardedData(baseData);
             } else {
                 entries = baseData.entries || [];
                 console.log('[Wiki] 使用非分片数据，条目数:', entries.length);
             }
             
-            // 合并数据
+            // 【关键】合并数据到 this.data（确保先赋值再解析图片）
             this.data = {
                 ...this.data,
                 settings: baseData.settings || this.data.settings || {},
@@ -376,7 +376,7 @@ Object.assign(window.app, {
                 camps: baseData.camps || ['主角团', '反派', '中立'],
                 synopsis: baseData.synopsis || [],
                 announcements: baseData.announcements || [],
-                homeContent: baseData.homeContent || [],
+                homeContent: baseData.homeContent || [], // 确保 homeContent 被加载
                 customFields: baseData.customFields || {},
                 entries: entries
             };
@@ -389,10 +389,21 @@ Object.assign(window.app, {
                 this.data.settings.subtitle = baseData.wikiSubtitle;
             }
             
-            // 【关键】解析图片引用
-            this.resolveImageReferences();
+            // 【关键修复】必须在数据赋值后调用，且确保配置存在
+            if (this.githubStorage.config.owner) {
+                console.log('[Wiki] 开始解析图片引用...');
+                this.resolveImageReferences();
+            } else {
+                console.warn('[Wiki] 未配置GitHub，跳过图片解析');
+            }
             
-            console.log('[Wiki] ✅ 数据加载完成，词条数:', entries.length);
+            // 【关键修复】确保 synopsis 图片也被解析
+            if (this.data.synopsis && this.data.synopsis.length > 0) {
+                this.resolveSynopsisImages();
+            }
+            
+            console.log('[Wiki] ✅ 数据加载完成，词条数:', entries.length, 'homeContent:', this.data.homeContent?.length);
+            
             this.applyFont();
             this.updateUIForMode();
             this.router('home');
@@ -408,6 +419,223 @@ Object.assign(window.app, {
                 this.initDefaultData();
             }
         }
+    },
+
+    // 【新增】专门解析剧情梗概图片
+    resolveSynopsisImages() {
+        if (!this.githubStorage.config.owner) return;
+        
+        const { owner, repo, branch, dataPath } = this.githubStorage.config;
+        const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}/images/`;
+        
+        this.data.synopsis.forEach((syn, idx) => {
+            if (syn.image && syn.image.startsWith('{{IMG:')) {
+                const filename = syn.image.slice(6, -2);
+                syn.image = baseUrl + filename;
+                console.log(`[Wiki] 解析Synopsis图片 ${idx}:`, syn.image);
+            }
+        });
+    },
+
+    // 【完整替换】resolveImageReferences 函数 - 强化版本
+    resolveImageReferences() {
+        if (!this.githubStorage.config.owner) {
+            console.warn('[Resolve] 无GitHub配置，跳过');
+            return;
+        }
+        
+        const { owner, repo, branch, dataPath } = this.githubStorage.config;
+        const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}/images/`;
+        
+        let resolvedCount = 0;
+        let missingCount = 0;
+        
+        console.log(`[Resolve] 开始解析图片引用，基础URL: ${baseUrl}`);
+        
+        // 辅助函数：安全解析引用
+        const resolveImageRef = (value) => {
+            if (!value || typeof value !== 'string') return null;
+            
+            // 已经是完整URL
+            if (value.startsWith('http')) return value;
+            
+            // 处理 {{IMG:filename}} 格式
+            if (value.startsWith('{{IMG:') && value.endsWith('}}')) {
+                const filename = value.slice(6, -2);
+                return baseUrl + encodeURIComponent(filename);
+            }
+            
+            // 处理旧格式或纯文件名
+            if (!value.includes('/') && !value.startsWith('data:')) {
+                return baseUrl + encodeURIComponent(value);
+            }
+            
+            return null;
+        };
+        
+        // 1. 解析条目图片
+        if (this.data.entries && Array.isArray(this.data.entries)) {
+            this.data.entries.forEach((entry, eIdx) => {
+                if (!entry.versions || !Array.isArray(entry.versions)) return;
+                
+                entry.versions.forEach((version, vIdx) => {
+                    // 处理旧版单个image字段
+                    if (version.image && version.image.startsWith('{{IMG:')) {
+                        const newUrl = resolveImageRef(version.image);
+                        if (newUrl) {
+                            console.log(`[Resolve] Entry ${entry.code} image: ${newUrl}`);
+                            version.image = newUrl;
+                            resolvedCount++;
+                        }
+                    }
+                    
+                    // 处理新版images对象
+                    if (version.images && typeof version.images === 'object') {
+                        ['avatar', 'card', 'cover'].forEach(type => {
+                            const value = version.images[type];
+                            if (value && value.startsWith('{{IMG:')) {
+                                const newUrl = resolveImageRef(value);
+                                if (newUrl) {
+                                    console.log(`[Resolve] Entry ${entry.code} images.${type}: ${newUrl}`);
+                                    version.images[type] = newUrl;
+                                    resolvedCount++;
+                                }
+                            }
+                        });
+                    }
+                });
+            });
+        }
+        
+        console.log(`[Resolve] 完成: ${resolvedCount} 个引用已解析`);
+    },
+
+    // 【完整替换】renderHome 函数 - 修复显示逻辑
+    renderHome(container) {
+        const tpl = document.getElementById('tpl-home');
+        if (!tpl) return;
+        
+        const clone = tpl.content.cloneNode(true);
+        container.appendChild(clone);
+        
+        // 从 settings 读取欢迎语
+        const settings = this.data.settings || {};
+        
+        const welcomeTitleEl = document.getElementById('welcome-title');
+        const welcomeSubtitleEl = document.getElementById('welcome-subtitle');
+        
+        if (welcomeTitleEl) {
+            welcomeTitleEl.textContent = settings.welcomeTitle || '欢迎来到 Wiki';
+        }
+        if (welcomeSubtitleEl) {
+            welcomeSubtitleEl.textContent = settings.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
+        }
+        
+        // 显示/隐藏编辑按钮
+        document.querySelectorAll('.edit-only').forEach(el => {
+            el.classList.toggle('hidden', this.runMode !== 'backend');
+        });
+        
+        // 后台入口区域控制
+        const backendEntry = document.getElementById('backend-entry-section');
+        if (backendEntry) {
+            backendEntry.classList.toggle('hidden', this.runMode === 'backend');
+        }
+        
+        // 【关键修复】确保自定义内容和公告在两种模式下都渲染
+        this.renderHomeCustomContent();
+        this.renderAnnouncementBanner();
+        
+        // 渲染历史记录（如果有）
+        this.renderHistoryIfExists();
+    },
+
+    // 【完整替换】renderHomeCustomContent 函数 - 修复前台模式显示
+    renderHomeCustomContent() {
+        const container = document.getElementById('home-custom-content');
+        if (!container) {
+            console.warn('[HomeCustom] 找不到容器 #home-custom-content');
+            return;
+        }
+        
+        container.innerHTML = '';
+        
+        // 检查数据是否存在
+        if (!this.data.homeContent || !Array.isArray(this.data.homeContent) || this.data.homeContent.length === 0) {
+            console.log('[HomeCustom] 无自定义内容', this.runMode);
+            if (this.runMode === 'backend') {
+                container.innerHTML = '<p class="text-gray-400 text-center py-4 text-sm">点击上方按钮添加自定义内容</p>';
+            }
+            return;
+        }
+        
+        console.log(`[HomeCustom] 渲染 ${this.data.homeContent.length} 项，模式: ${this.runMode}`);
+        
+        this.data.homeContent.forEach((item, idx) => {
+            if (!item) return;
+            
+            if (item.type === 'text') {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'relative group';
+                
+                if (this.runMode === 'backend') {
+                    // 编辑模式：显示可编辑文本框和删除按钮
+                    wrapper.innerHTML = `
+                        <button onclick="app.removeHomeItem(${idx})" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition z-10 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow">
+                            <i class="fa-solid fa-times"></i>
+                        </button>
+                        <textarea class="w-full p-3 border border-gray-200 rounded-lg text-sm min-h-[100px] resize-y focus:ring-2 focus:ring-indigo-500 outline-none" 
+                            placeholder="输入文本内容..."
+                            onchange="app.updateHomeText(${idx}, this.value)">${item.content || ''}</textarea>
+                    `;
+                } else {
+                    // 【关键】前台模式：显示纯文本内容
+                    wrapper.className = 'bg-white p-4 rounded-lg border border-gray-100 shadow-sm';
+                    // 使用 white-space: pre-wrap 保留换行
+                    wrapper.innerHTML = `<p class="text-gray-700 text-sm leading-relaxed" style="white-space: pre-wrap;">${this.escapeHtml(item.content || '')}</p>`;
+                }
+                container.appendChild(wrapper);
+                
+            } else if (item.type === 'entry-ref') {
+                const entry = this.data.entries.find(e => e.id === item.entryId);
+                if (!entry) {
+                    console.warn(`[HomeCustom] 找不到条目: ${item.entryId}`);
+                    return;
+                }
+                
+                const version = this.getVisibleVersion(entry);
+                const displayTitle = item.title || version?.title || entry.code;
+                
+                const div = document.createElement('div');
+                div.className = 'bg-indigo-50 p-3 rounded-xl border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition flex items-center gap-3';
+                div.onclick = () => this.openEntry(entry.id);
+                
+                if (this.runMode === 'backend') {
+                    div.innerHTML = `
+                        <i class="fa-solid fa-book text-indigo-500"></i>
+                        <span class="font-medium text-indigo-700 flex-1 truncate">${this.escapeHtml(displayTitle)}</span>
+                        <button onclick="event.stopPropagation(); app.removeHomeItem(${idx})" class="text-gray-400 hover:text-red-500 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition">
+                            <i class="fa-solid fa-times text-xs"></i>
+                        </button>
+                    `;
+                } else {
+                    // 前台模式：简洁显示
+                    div.innerHTML = `
+                        <i class="fa-solid fa-book text-indigo-500"></i>
+                        <span class="font-medium text-indigo-700 truncate">${this.escapeHtml(displayTitle)}</span>
+                    `;
+                }
+                container.appendChild(div);
+            }
+        });
+    },
+
+    // 【辅助】HTML转义函数（前台模式需要）
+    escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     },
     // 【新增】数据修复方法
     async repairData() {
@@ -448,92 +676,6 @@ Object.assign(window.app, {
             });
         }
     },
-    // 【替换】resolveImageReferences - 修复图片引用解析
-    resolveImageReferences() {
-        if (!this.githubStorage.config.owner) return;
-        
-        const { owner, repo, branch, dataPath } = this.githubStorage.config;
-        const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}/images/`;
-        
-        let resolvedCount = 0;
-        let missingCount = 0;
-        
-        // 辅助函数：解析引用
-        const resolveRef = (value) => {
-            if (!value || typeof value !== 'string') return null;
-            
-            // 处理 {{IMG:filename}} 格式
-            if (value.startsWith('{{IMG:') && value.endsWith('}}')) {
-                const filename = value.slice(6, -2);
-                return { url: baseUrl + filename, filename };
-            }
-            
-            // 处理已经是完整URL的情况
-            if (value.startsWith('http')) {
-                return { url: value, filename: null };
-            }
-            
-            // 处理相对路径（如 images/xxx.jpg）
-            if (value.includes('/')) {
-                const parts = value.split('/');
-                const filename = parts[parts.length - 1];
-                return { url: baseUrl + filename, filename };
-            }
-            
-            return null;
-        };
-        
-        // 1. 解析条目图片
-        if (this.data.entries) {
-            this.data.entries.forEach(entry => {
-                if (!entry.versions) return;
-                
-                entry.versions.forEach(version => {
-                    // 处理旧版单个image字段
-                    if (version.image) {
-                        const resolved = resolveRef(version.image);
-                        if (resolved) {
-                            version.image = resolved.url;
-                            resolvedCount++;
-                            console.log(`[Resolve] Entry ${entry.code} image -> ${resolved.url}`);
-                        }
-                    }
-                    
-                    // 处理新版images对象
-                    if (version.images) {
-                        ['avatar', 'card', 'cover'].forEach(type => {
-                            const value = version.images[type];
-                            if (value) {
-                                const resolved = resolveRef(value);
-                                if (resolved) {
-                                    version.images[type] = resolved.url;
-                                    resolvedCount++;
-                                }
-                            }
-                        });
-                    }
-                });
-            });
-        }
-        
-        // 2. 解析剧情梗概图片
-        if (this.data.synopsis) {
-            this.data.synopsis.forEach((syn, idx) => {
-                if (syn.image) {
-                    const resolved = resolveRef(syn.image);
-                    if (resolved) {
-                        syn.image = resolved.url;
-                        resolvedCount++;
-                    } else {
-                        missingCount++;
-                        console.warn(`[Resolve] Synopsis ${idx} 图片引用无法解析:`, syn.image);
-                    }
-                }
-            });
-        }
-        
-        console.log(`[Wiki] 图片引用解析完成: ${resolvedCount} 成功, ${missingCount} 失败`);
-    },
     initDefaultData() {
         this.data = {
             entries: [],
@@ -553,40 +695,6 @@ Object.assign(window.app, {
                 customFont: null
             }
         };
-    },
-    renderAnnouncementBanner() {
-        const activeAnn = this.data.announcements?.find(a => a.isActive);
-        const annSection = document.getElementById('announcement-section');
-        
-        if (!annSection) return;
-        
-        if (activeAnn) {
-            annSection.classList.remove('hidden');
-            
-            const annTitle = document.getElementById('announcement-title');
-            const annPreview = document.getElementById('announcement-preview');
-            const annMeta = document.getElementById('announcement-meta');
-            
-            if (annTitle) annTitle.textContent = activeAnn.title || '最新公告';
-            
-            if (annPreview) {
-                // 去除HTML标签获取纯文本预览
-                const temp = document.createElement('div');
-                temp.innerHTML = activeAnn.content || '';
-                const text = temp.textContent || '';
-                annPreview.textContent = text.substring(0, 100) + (text.length > 100 ? '...' : '');
-            }
-            
-            if (annMeta) {
-                annMeta.innerHTML = `
-                    <i class="fa-solid fa-user-pen mr-1"></i>${activeAnn.author || '匿名'} 
-                    <span class="mx-2">•</span> 
-                    <i class="fa-regular fa-calendar mr-1"></i>${activeAnn.date || new Date(activeAnn.createdAt).toLocaleDateString('zh-CN')}
-                `;
-            }
-        } else {
-            annSection.classList.add('hidden');
-        }
     },
     // ========== 根据模式更新UI ==========
     updateUIForMode() {
@@ -725,112 +833,6 @@ Object.assign(window.app, {
         if (pushState) {
             history.pushState({ target }, '', `#${target}`);
         }
-    },
-
-    renderHome(container) {
-        const tpl = document.getElementById('tpl-home');
-        if (!tpl) return;
-        
-        const clone = tpl.content.cloneNode(true);
-        container.appendChild(clone);
-        
-        // 【关键】强制从 this.data.settings 读取（不再兼容旧字段）
-        const settings = this.data.settings || {};
-        
-        // 修复大蓝框欢迎语
-        const welcomeTitleEl = document.getElementById('welcome-title');
-        const welcomeSubtitleEl = document.getElementById('welcome-subtitle');
-        
-        if (welcomeTitleEl) {
-            welcomeTitleEl.textContent = settings.welcomeTitle || '欢迎来到 Wiki';
-        }
-        if (welcomeSubtitleEl) {
-            welcomeSubtitleEl.textContent = settings.welcomeSubtitle || '探索角色、世界观与错综复杂的关系网。';
-        }
-        
-        // 【保留按钮】显示/隐藏编辑按钮（确保批量导入按钮也不被删除）
-        document.querySelectorAll('.edit-only').forEach(el => {
-            el.classList.toggle('hidden', this.runMode !== 'backend');
-        });
-        
-        // 后台入口区域显示逻辑
-        const backendEntry = document.getElementById('backend-entry-section');
-        if (backendEntry) {
-            backendEntry.classList.toggle('hidden', this.runMode === 'backend');
-        }
-        
-        // 渲染其他内容
-        this.renderHomeCustomContent();
-        this.renderAnnouncementBanner();
-    },
-
-    renderHomeCustomContent() {
-        const container = document.getElementById('home-custom-content') || document.getElementById('home-text-boxes');
-        if (!container) return;
-        
-        container.innerHTML = '';
-        
-        // 【修复】移除 "暂无自定义内容" 的占位提示，保持区域干净
-        if (!this.data.homeContent || this.data.homeContent.length === 0) {
-            // 编辑模式下显示提示，查看模式下保持空白
-            if (this.runMode === 'backend') {
-                container.innerHTML = '<p class="text-gray-400 text-center py-4 text-sm">点击上方按钮添加自定义内容</p>';
-            }
-            return;
-        }
-        
-        this.data.homeContent.forEach((item, idx) => {
-            if (item.type === 'text') {
-                const wrapper = document.createElement('div');
-                wrapper.className = 'relative group';
-                
-                if (this.runMode === 'backend') {
-                    // 编辑模式：显示可编辑文本框和删除按钮
-                    wrapper.innerHTML = `
-                        <button onclick="app.removeHomeItem(${idx})" class="absolute top-2 right-2 text-gray-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition z-10 bg-white rounded-full w-6 h-6 flex items-center justify-center shadow">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                        <textarea class="w-full p-3 border border-gray-200 rounded-lg text-sm min-h-[100px] resize-y focus:ring-2 focus:ring-indigo-500 outline-none" 
-                            placeholder="输入文本内容..."
-                            onchange="app.updateHomeText(${idx}, this.value)">${item.content || ''}</textarea>
-                    `;
-                } else {
-                    // 查看模式：只显示纯文本
-                    wrapper.className = 'bg-white p-4 rounded-lg border border-gray-100 shadow-sm';
-                    wrapper.innerHTML = `<p class="text-gray-700 text-sm leading-relaxed whitespace-pre-wrap">${item.content || ''}</p>`;
-                }
-                container.appendChild(wrapper);
-                
-            } else if (item.type === 'entry-ref') {
-                const entry = this.data.entries.find(e => e.id === item.entryId);
-                if (!entry) return;
-                
-                const version = this.getVisibleVersion(entry);
-                const displayTitle = item.title || version?.title || entry.code;
-                
-                const div = document.createElement('div');
-                div.className = 'bg-indigo-50 p-3 rounded-xl border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition flex items-center gap-3';
-                div.onclick = () => this.openEntry(entry.id);
-                
-                if (this.runMode === 'backend') {
-                    // 编辑模式：显示标题和删除按钮
-                    div.innerHTML = `
-                        <i class="fa-solid fa-book text-indigo-500"></i>
-                        <span class="font-medium text-indigo-700 flex-1 truncate">${displayTitle}</span>
-                        <button onclick="event.stopPropagation(); app.removeHomeItem(${idx})" class="text-gray-400 hover:text-red-500 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition">
-                            <i class="fa-solid fa-times text-xs"></i>
-                        </button>
-                    `;
-                } else {
-                    // 查看模式：简洁显示
-                    div.innerHTML = `
-                        <i class="fa-solid fa-book text-indigo-500"></i>
-                        <span class="font-medium text-indigo-700 truncate">${displayTitle}</span>
-                    `;
-                }
-                container.appendChild(div);
-            }
-        });
     },
 
     renderList(container, type) {
@@ -1476,12 +1478,15 @@ Object.assign(window.app, {
         const clone = tpl.content.cloneNode(true);
         container.appendChild(clone);
     },
-
-    // 【替换】saveAnnouncement - 添加数据验证和错误处理
+    // 【完整替换】saveAnnouncement 函数 - 使用原子保存确保数据完整性
     async saveAnnouncement() {
-        const title = document.getElementById('announcement-edit-title')?.value?.trim();
-        const author = document.getElementById('announcement-edit-author')?.value?.trim();
-        const content = document.getElementById('announcement-edit-content')?.value?.trim();
+        const titleInput = document.getElementById('announcement-edit-title');
+        const authorInput = document.getElementById('announcement-edit-author');
+        const contentInput = document.getElementById('announcement-edit-content');
+        
+        const title = titleInput?.value?.trim();
+        const author = authorInput?.value?.trim();
+        const content = contentInput?.value?.trim();
 
         if (!title) {
             this.showAlertDialog({
@@ -1492,8 +1497,8 @@ Object.assign(window.app, {
             return;
         }
 
-        // 【关键】确保 announcements 数组存在
-        if (!this.data.announcements) {
+        // 确保 announcements 数组存在
+        if (!this.data.announcements || !Array.isArray(this.data.announcements)) {
             this.data.announcements = [];
         }
 
@@ -1512,23 +1517,112 @@ Object.assign(window.app, {
         this.data.announcements.unshift(newAnn);
 
         try {
-            // 【关键】使用简单保存模式，避免分片导致数据丢失
-            const result = await this.saveDataSimple();
+            console.log('[Announcement] 正在保存公告...', newAnn);
             
-            if (!result.success) {
-                throw new Error(result.error || '保存失败');
-            }
+            // 【关键】使用原子保存模式，避免分片导致数据丢失
+            await this.saveDataAtomic();
             
-            this.showToast('公告已保存', 'success');
+            this.showToast('公告已发布', 'success');
+            
+            // 保存成功后返回首页
             this.router('home');
             
         } catch (error) {
             console.error('[Announcement] 保存失败:', error);
             this.showAlertDialog({
                 title: '保存失败',
-                message: '公告保存失败: ' + error.message + '\n\n请检查GitHub连接或尝试重新导入数据。',
+                message: '公告保存失败: ' + error.message + '\n\n建议：\n1. 检查GitHub Token是否有效\n2. 尝试重新导入数据\n3. 刷新页面后重试',
                 type: 'error'
             });
+        }
+    },
+
+    // 【新增】原子保存方法（非分片，确保数据完整性）
+    async saveDataAtomic() {
+        console.log('[Wiki] 执行原子保存...');
+        
+        // 深拷贝数据
+        const dataToSave = JSON.parse(JSON.stringify(this.data));
+        
+        // 清理内嵌base64图片（避免体积过大）
+        if (dataToSave.entries) {
+            dataToSave.entries.forEach(entry => {
+                if (entry.versions) {
+                    entry.versions.forEach(v => {
+                        if (v.image && v.image.startsWith('data:')) v.image = null;
+                        if (v.images) {
+                            Object.keys(v.images).forEach(k => {
+                                if (v.images[k] && v.images[k].startsWith('data:')) v.images[k] = null;
+                            });
+                        }
+                    });
+                }
+            });
+        }
+        
+        // 添加版本标记
+        dataToSave.version = '2.7.0-atomic';
+        dataToSave.lastUpdate = Date.now();
+        
+        const content = JSON.stringify(dataToSave, null, 2);
+        
+        try {
+            // 直接保存到 data.json，不使用分片
+            await this.githubStorage.putFile('data.json', content, 'Update Wiki data (atomic save)', false, 5);
+            
+            console.log('[Wiki] 原子保存成功');
+            return true;
+        } catch (error) {
+            console.error('[Wiki] 原子保存失败:', error);
+            throw error;
+        }
+    },
+
+    // 【完整替换】renderAnnouncementBanner 函数 - 确保两种模式都显示
+    renderAnnouncementBanner() {
+        // 【关键】查找活跃公告（不区分模式，数据应该一致）
+        const activeAnn = this.data.announcements?.find(a => a.isActive);
+        const annSection = document.getElementById('announcement-section');
+        
+        if (!annSection) {
+            console.warn('[Announcement] 找不到公告区域');
+            return;
+        }
+        
+        console.log('[Announcement] 渲染公告:', activeAnn?.title || '无', '模式:', this.runMode);
+        
+        if (activeAnn) {
+            annSection.classList.remove('hidden');
+            
+            const annTitle = document.getElementById('announcement-title');
+            const annPreview = document.getElementById('announcement-preview');
+            const annMeta = document.getElementById('announcement-meta');
+            
+            if (annTitle) annTitle.textContent = activeAnn.title || '最新公告';
+            
+            if (annPreview) {
+                // 去除HTML标签获取纯文本预览
+                const temp = document.createElement('div');
+                temp.innerHTML = activeAnn.content || '';
+                const text = temp.textContent || '';
+                annPreview.textContent = text.substring(0, 100) + (text.length > 100 ? '...' : '');
+            }
+            
+            if (annMeta) {
+                annMeta.innerHTML = `
+                    <i class="fa-solid fa-user-pen mr-1"></i>${activeAnn.author || '匿名'} 
+                    <span class="mx-2">•</span> 
+                    <i class="fa-regular fa-calendar mr-1"></i>${activeAnn.date || new Date(activeAnn.createdAt).toLocaleDateString('zh-CN')}
+                `;
+            }
+            
+            // 绑定点击事件查看详情
+            const banner = annSection.querySelector('.announcement-banner');
+            if (banner) {
+                banner.onclick = () => this.viewAnnouncement();
+            }
+        } else {
+            annSection.classList.add('hidden');
         }
     },
 
@@ -3332,8 +3426,31 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
             }
         };
     },
-    // 【替换】saveData 方法 - 实现分片保存与冲突退避
     async saveData(progressCallback = null) {
+        // 估算数据大小
+        const dataSize = JSON.stringify(this.data).length;
+        const entryCount = this.data.entries?.length || 0;
+        
+        console.log(`[Wiki] 保存数据: ${entryCount} 条目, 约 ${(dataSize/1024).toFixed(2)} KB`);
+        
+        // 如果数据量小（<100KB或条目<30），使用原子保存
+        if (dataSize < 100 * 1024 || entryCount < 30) {
+            console.log('[Wiki] 数据量较小，使用原子保存');
+            if (progressCallback) {
+                progressCallback(50, '保存中...');
+            }
+            await this.saveDataAtomic();
+            if (progressCallback) {
+                progressCallback(100, '完成');
+            }
+        } else {
+            // 大数据量使用分片保存
+            console.log('[Wiki] 数据量较大，使用分片保存');
+            await this.saveDataSharded(progressCallback);
+        }
+    },
+    // 【替换】saveDataSharded 方法 - 实现分片保存与冲突退避
+    async saveDataSharded(progressCallback = null) {
         try {
             console.log('[Wiki] 开始分片保存数据...');
             
