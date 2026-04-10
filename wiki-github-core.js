@@ -368,7 +368,7 @@ Object.assign(window.app, {
                 console.log('[Wiki] 使用非分片数据，条目数:', entries.length);
             }
             
-            // 【关键】合并数据到 this.data（确保先赋值再解析图片）
+            // 【关键】合并数据到 this.data（确保 entries 先赋值）
             this.data = {
                 ...this.data,
                 settings: baseData.settings || this.data.settings || {},
@@ -376,9 +376,9 @@ Object.assign(window.app, {
                 camps: baseData.camps || ['主角团', '反派', '中立'],
                 synopsis: baseData.synopsis || [],
                 announcements: baseData.announcements || [],
-                homeContent: baseData.homeContent || [], // 确保 homeContent 被加载
+                homeContent: baseData.homeContent || [],
                 customFields: baseData.customFields || {},
-                entries: entries
+                entries: entries  // 确保这行在调用 resolveImageReferences 之前
             };
             
             // 兼容旧版字段映射
@@ -389,31 +389,24 @@ Object.assign(window.app, {
                 this.data.settings.subtitle = baseData.wikiSubtitle;
             }
             
-            // 【关键修复】必须在数据赋值后调用，且确保配置存在
-            if (this.githubStorage.config.owner) {
+            // 【关键修复】确保 githubStorage 已配置且数据已合并后再解析图片
+            if (this.githubStorage?.config?.owner && this.data.entries) {
                 console.log('[Wiki] 开始解析图片引用...');
-                this.resolveImageReferences();
+                // 使用 setTimeout 确保数据绑定完成（解决某些浏览器的异步问题）
+                setTimeout(() => {
+                    this.resolveImageReferences();
+                    // 解析完成后刷新当前页面以显示图片
+                    if (this.data.currentTarget === 'home' || this.data.currentTarget === 'characters') {
+                        this.router(this.data.currentTarget || 'home', false);
+                    }
+                }, 0);
             } else {
-                console.warn('[Wiki] 未配置GitHub，跳过图片解析');
+                console.warn('[Wiki] 未配置GitHub或无条目数据，跳过图片解析');
             }
             
             // 【关键修复】确保 synopsis 图片也被解析
             if (this.data.synopsis && this.data.synopsis.length > 0) {
-                this.resolveSynopsisImages();
-            }
-            
-            console.log('[Wiki] ✅ 数据加载完成，词条数:', entries.length, 'homeContent:', this.data.homeContent?.length);
-            console.log('[Wiki] 数据详情:', {
-                entries: this.data.entries?.length,
-                homeContent: this.data.homeContent?.length,
-                announcements: this.data.announcements?.length,
-                synopsis: this.data.synopsis?.length,
-                settings: this.data.settings?.name
-            });
-
-            // 【关键】如果 homeContent 存在但页面未显示，强制重新渲染
-            if (this.data.homeContent && this.data.homeContent.length > 0) {
-                console.log('[Wiki] homeContent 数据:', JSON.stringify(this.data.homeContent));
+                setTimeout(() => this.resolveSynopsisImages(), 100);
             }
             
             this.applyFont();
@@ -451,22 +444,25 @@ Object.assign(window.app, {
 
     // 【完整替换】resolveImageReferences 函数 - 强化版本
     resolveImageReferences() {
-        if (!this.githubStorage.config.owner) {
+        if (!this.githubStorage || !this.githubStorage.config || !this.githubStorage.config.owner) {
             console.warn('[Resolve] 无GitHub配置，跳过');
             return;
         }
         
         const { owner, repo, branch, dataPath } = this.githubStorage.config;
-        const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath}/images/`;
+        
+        // 【关键修复】确保 dataPath 存在，防止 undefined 导致 URL 错误
+        const safeDataPath = dataPath || 'wiki-data';
+        const baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${safeDataPath}/images/`;
         
         let resolvedCount = 0;
         let skippedCount = 0;
         
         console.log(`[Resolve] 开始解析图片引用，基础URL: ${baseUrl}`);
-        console.log(`[Resolve] 条目数量: ${this.data.entries?.length || 0}`);
+        console.log(`[Resolve] 条目数量: ${this.data?.entries?.length || 0}`);
 
-        // 辅助函数：解析各种格式的引用
         const resolveImageValue = (value) => {
+            // 【关键修复】严格检查类型，防止非字符串值导致错误
             if (!value || typeof value !== 'string') return null;
             
             // 已经是完整URL，无需处理
@@ -478,36 +474,40 @@ Object.assign(window.app, {
             // 标准格式 {{IMG:filename}}
             if (value.startsWith('{{IMG:') && value.endsWith('}}')) {
                 const filename = value.slice(6, -2);
+                // 【新增】过滤空文件名
+                if (!filename || filename.trim() === '') return null;
                 return baseUrl + encodeURIComponent(filename);
             }
             
-            // 处理可能的双花括号内嵌格式 {{{IMG:...}}}（容错）
+            // 容错：处理可能的双花括号内嵌格式
             const match = value.match(/\{\{IMG:([^}]+)\}\}/);
-            if (match) {
-                const filename = match[1];
-                return baseUrl + encodeURIComponent(filename);
-            }
-            
-            // 如果是纯文件名（如 xxx.jpg），也尝试解析
-            if (!value.includes('/') && !value.startsWith('data:') && value.includes('.')) {
-                console.log(`[Resolve] 检测到纯文件名: ${value}`);
-                return baseUrl + encodeURIComponent(value);
+            if (match && match[1]) {
+                return baseUrl + encodeURIComponent(match[1]);
             }
             
             return null;
         };
 
-        // 1. 解析条目图片
-        if (this.data.entries && Array.isArray(this.data.entries)) {
-            this.data.entries.forEach((entry) => {
-                if (!entry.versions || !Array.isArray(entry.versions)) return;
+        // 1. 解析条目图片（增加空值保护）
+        if (this.data?.entries && Array.isArray(this.data.entries)) {
+            this.data.entries.forEach((entry, idx) => {
+                if (!entry || !entry.versions || !Array.isArray(entry.versions)) return;
                 
                 entry.versions.forEach((version) => {
+                    if (!version) return;
+                    
                     // 处理旧版单个image字段
-                    if (version.image) {
+                    if (version.image && typeof version.image === 'string') {
+                        // 【修复】如果已经是data:开头的base64，清除它（不应存储在JSON中）
+                        if (version.image.startsWith('data:')) {
+                            console.warn(`[Resolve] 清除内嵌base64图片: ${entry.code}`);
+                            version.image = null;
+                            return;
+                        }
+                        
                         const newUrl = resolveImageValue(version.image);
                         if (newUrl && newUrl !== version.image) {
-                            console.log(`[Resolve] ${entry.code} image: ${version.image.substring(0, 30)}... -> ${newUrl.substring(0, 50)}...`);
+                            console.log(`[Resolve] ${entry.code || idx} image 已解析`);
                             version.image = newUrl;
                             resolvedCount++;
                         }
@@ -517,10 +517,15 @@ Object.assign(window.app, {
                     if (version.images && typeof version.images === 'object') {
                         ['avatar', 'card', 'cover'].forEach(type => {
                             const value = version.images[type];
-                            if (value) {
+                            if (value && typeof value === 'string') {
+                                // 【修复】同样清除内嵌base64
+                                if (value.startsWith('data:')) {
+                                    version.images[type] = null;
+                                    return;
+                                }
+                                
                                 const newUrl = resolveImageValue(value);
                                 if (newUrl && newUrl !== value) {
-                                    console.log(`[Resolve] ${entry.code} images.${type}: ${value.substring(0, 30)}... -> ...`);
                                     version.images[type] = newUrl;
                                     resolvedCount++;
                                 }
@@ -531,41 +536,21 @@ Object.assign(window.app, {
             });
         }
 
-        // 2. 【新增】解析剧情梗概图片
-        if (this.data.synopsis && Array.isArray(this.data.synopsis)) {
+        // 2. 解析剧情梗概图片（同样增加保护）
+        if (this.data?.synopsis && Array.isArray(this.data.synopsis)) {
             this.data.synopsis.forEach((syn, idx) => {
-                if (syn.image) {
-                    const newUrl = resolveImageValue(syn.image);
-                    if (newUrl && newUrl !== syn.image) {
-                        console.log(`[Resolve] Synopsis[${idx}]: ${syn.image.substring(0, 30)}... -> ...`);
-                        syn.image = newUrl;
-                        resolvedCount++;
-                    }
-                }
-            });
-        }
-
-        // 3. 【新增】解析公告图片（如果有）
-        if (this.data.announcements && Array.isArray(this.data.announcements)) {
-            this.data.announcements.forEach((ann, idx) => {
-                if (ann.image) {
-                    const newUrl = resolveImageValue(ann.image);
-                    if (newUrl && newUrl !== ann.image) {
-                        ann.image = newUrl;
-                        resolvedCount++;
-                    }
+                if (!syn?.image || typeof syn.image !== 'string') return;
+                
+                const newUrl = resolveImageValue(syn.image);
+                if (newUrl && newUrl !== syn.image) {
+                    console.log(`[Resolve] Synopsis[${idx}] 图片已解析`);
+                    syn.image = newUrl;
+                    resolvedCount++;
                 }
             });
         }
 
         console.log(`[Resolve] 完成: ${resolvedCount} 个引用已解析, ${skippedCount} 个已跳过`);
-        
-        // 如果没有解析到任何图片，可能是URL构建问题，打印警告
-        if (resolvedCount === 0 && this.data.entries?.length > 0) {
-            console.warn('[Resolve] 警告: 未解析到任何图片引用，请检查:');
-            console.warn('1. 数据中的图片引用格式是否为 {{IMG:filename}}');
-            console.warn('2. GitHub配置是否正确:', this.githubStorage.config);
-        }
     },
 
     // 【完整替换】renderHome 函数 - 修复显示逻辑

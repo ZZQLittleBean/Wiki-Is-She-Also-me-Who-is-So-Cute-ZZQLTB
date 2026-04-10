@@ -31,11 +31,11 @@
                     owner: window.WIKI_HARDCODED_CONFIG.owner,
                     repo: window.WIKI_HARDCODED_CONFIG.repo,
                     branch: window.WIKI_HARDCODED_CONFIG.branch || 'main',
-                    dataPath: window.WIKI_HARDCODED_CONFIG.dataPath || 'wiki-data',
-                    token: '' // Token从localStorage或首次输入获取
+                    dataPath: window.WIKI_HARDCODED_CONFIG.dataPath || 'wiki-data',  // 【确保默认值】
+                    token: ''
                 };
                 
-                // 尝试从localStorage补全Token（该设备若已登录过）
+                // 尝试从localStorage补全Token
                 const savedLogin = localStorage.getItem('wiki_backend_login');
                 if (savedLogin) {
                     try {
@@ -48,11 +48,19 @@
                 return true;
             }
             
-            // 原有逻辑：localStorage模式（保留用于开发或特殊情况）
+            // 原有逻辑：localStorage模式
             const savedConfig = localStorage.getItem('wiki_github_config');
             if (savedConfig) {
                 try {
-                    this.config = JSON.parse(savedConfig);
+                    const parsed = JSON.parse(savedConfig);
+                    // 【修复】确保补全所有必要字段，防止 undefined
+                    this.config = {
+                        owner: parsed.owner || '',
+                        repo: parsed.repo || '',
+                        branch: parsed.branch || 'main',
+                        dataPath: parsed.dataPath || 'wiki-data',  // 【关键】防止 undefined
+                        token: parsed.token || ''
+                    };
                     return true;
                 } catch (e) {
                     console.warn('[GitHub] 配置解析失败');
