@@ -1405,14 +1405,12 @@ Object.assign(window.app, {
                     `;
                 }
                 
-                // 【修正】内容处理：支持@姓名[编号]格式和换行
+                // 内容处理：支持@姓名[编号]格式和换行
                 let content = chapter.content || '';
                 
-                // 【关键修正】使用字符串分割方式避免正则转义问题，或修正后的正则
-                // 方式1：使用修正的正则（推荐）
-                // 注意：在字符串中，\[ 需要写成 \\[，但在正则字面量中，\[ 就是 \[
+                // 【关键修正】使用正确的正则表达式匹配 @姓名[编号]
+                // 注意：在字符类 [^\[\]] 中，方括号需要转义
                 content = content.replace(/@([^\[\]]+)\[([A-Z]-\d{3})\]/g, function(match, name, code) {
-                    // 查找对应条目
                     const entry = window.app.data.entries.find(e => e.code === code);
                     if (entry) {
                         return '<span class="inline-flex items-center gap-1.5 bg-indigo-50 text-indigo-700 px-2 py-1 rounded-md text-sm font-medium cursor-pointer hover:bg-indigo-100 transition border border-indigo-100" onclick="window.app.openEntry(\'' + entry.id + '\')">' +
@@ -1427,14 +1425,14 @@ Object.assign(window.app, {
                 // 处理换行符
                 content = content.replace(/\n/g, '<br>');
                 
-                // 支持基础HTML格式（安全过滤）
+                // 支持基础HTML格式
                 content = content.replace(/&lt;(b|i|u|br)\s*\/?&gt;/g, '<$1>');
                 content = content.replace(/&lt;\/(b|i|u)&gt;/g, '</$1>');
                 
                 item.innerHTML = `
                     <h3 class="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
                         <span class="bg-indigo-600 text-white text-sm px-2 py-1 rounded-md font-mono">${this.formatChapterNum(chapter.num)}</span>
-                        <span>${chapter.title || `第${chapter.num}章`}</span>
+                        <span>${chapter.title || '第' + chapter.num + '章'}</span>
                     </h3>
                     ${imageHtml}
                     <div class="prose prose-sm max-w-none text-gray-600 leading-relaxed">
