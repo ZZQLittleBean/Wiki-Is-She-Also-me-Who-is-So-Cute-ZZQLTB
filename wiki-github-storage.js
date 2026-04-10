@@ -6,6 +6,14 @@
 
 (function() {
     'use strict';
+    // 【部署配置】在此处硬编码您的GitHub仓库信息，实现全局绑定
+    window.WIKI_HARDCODED_CONFIG = {
+        owner: 'ZZQLittleBean',  // 修改为您的GitHub用户名
+        repo: 'Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io',  // 修改为仓库名
+        branch: 'main',
+        dataPath: 'wiki-data'
+    };
+    // 注意：Token不要写在这里！首次后台登录时输入，之后该设备自动记住
 
     window.WikiGitHubStorage = {
         config: {
@@ -17,6 +25,30 @@
         },
 
         init() {
+            // 【新增】优先检查硬编码配置（全局绑定模式）
+            if (window.WIKI_HARDCODED_CONFIG && window.WIKI_HARDCODED_CONFIG.owner && window.WIKI_HARDCODED_CONFIG.repo) {
+                this.config = {
+                    owner: window.WIKI_HARDCODED_CONFIG.owner,
+                    repo: window.WIKI_HARDCODED_CONFIG.repo,
+                    branch: window.WIKI_HARDCODED_CONFIG.branch || 'main',
+                    dataPath: window.WIKI_HARDCODED_CONFIG.dataPath || 'wiki-data',
+                    token: '' // Token从localStorage或首次输入获取
+                };
+                
+                // 尝试从localStorage补全Token（该设备若已登录过）
+                const savedLogin = localStorage.getItem('wiki_backend_login');
+                if (savedLogin) {
+                    try {
+                        const loginData = JSON.parse(savedLogin);
+                        if (loginData.token) this.config.token = loginData.token;
+                    } catch(e) {}
+                }
+                
+                console.log('[GitHub] 使用硬编码配置:', this.config.owner + '/' + this.config.repo);
+                return true;
+            }
+            
+            // 原有逻辑：localStorage模式（保留用于开发或特殊情况）
             const savedConfig = localStorage.getItem('wiki_github_config');
             if (savedConfig) {
                 try {
@@ -139,7 +171,23 @@
 
                     if (response.status === 422 || response.status === 409) {
                         const err = await response.json().catch(() => ({}));
-                        console.warn(`[GitHub] ${response.status}: ${err.message}，等待后重试...`);
+                        console.warn(`[GitHub] ${response.status}: ${err.message}，重新获取SHA...`);
+                        
+                        // 【关键修复】409冲突时强制重新获取最新SHA
+                        if (response.status === 409) {
+                            try {
+                                // 等待更长时间确保GitHub内部状态同步
+                                await new Promise(r => setTimeout(r, 3000));
+                                const latest = await this.getFile(path);
+                                if (latest && latest.sha) {
+                                    sha = latest.sha;
+                                    console.log(`[GitHub] 已刷新SHA: ${sha.substr(0,8)}...`);
+                                }
+                            } catch (e) {
+                                console.warn('[GitHub] SHA刷新失败:', e.message);
+                            }
+                        }
+                        
                         await new Promise(r => setTimeout(r, 2000 * attempt));
                         continue;
                     }
@@ -294,26 +342,6 @@
         async saveWikiData(data) {
             const content = JSON.stringify(data, null, 2);
             return await this.putFile('data.json', content, 'Update Wiki data');
-        },
-
-        async saveImage(filename, dataUrl) {
-            try {
-                // 提取 base64 部分
-                let base64 = dataUrl;
-                if (dataUrl.includes(',')) {
-                    base64 = dataUrl.split(',')[1];
-                }
-                
-                // 移除 dataUrl 前缀可能残留的空白
-                base64 = base64.trim();
-                
-                // 使用 isBinary=true 模式，避免二次 base64 编码
-                await this.putFile(`images/${filename}`, base64, `Add image: ${filename}`, true);
-                return true;
-            } catch (error) {
-                console.error('[GitHub] 保存图片失败:', filename, error.message);
-                throw error;
-            }
         },
 
         async loadImage(filename) {
