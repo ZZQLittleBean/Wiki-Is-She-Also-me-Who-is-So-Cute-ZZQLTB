@@ -1202,13 +1202,13 @@ Object.assign(window.app, {
         contentEl.innerHTML = contentHtml;
         container.appendChild(clone);
     },
-
-    // 【新增】解析角色引用格式 @姓名[编号] → 蓝色标签
+    // 【修复】解析角色引用格式 @姓名[编号] → 蓝色标签
     parseCharacterReferences(text) {
         if (!text) return '';
-        // 匹配 @姓名[编号] 格式，转换为蓝色标签
-        return text.replace(/@([^[\n]+?)\\[([A-Z]-\\d+)\\]/g, (match, name, code) => {
-            // 查找对应条目
+        
+        // 【修复】使用正确的正则表达式：/@姓名[C-001]/
+        // [^\[\]] 匹配非方括号字符，\[ 匹配字面量左方括号
+        return text.replace(/@([^\[\]]+)\[([A-Z]-\d{3})\]/g, (match, name, code) => {
             const entry = this.data.entries.find(e => e.code === code);
             const entryId = entry ? entry.id : '';
             return `<span class="character-reference-tag" data-entry-id="${entryId}" data-code="${code}" onclick="app.openEntryByCode('${code}')">${name}</span>`;
