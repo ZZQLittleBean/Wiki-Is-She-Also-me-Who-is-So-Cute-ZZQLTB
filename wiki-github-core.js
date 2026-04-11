@@ -3029,7 +3029,7 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             importedData.synopsis.forEach(syn => {
                 if (!syn.image || syn.image.startsWith('data:')) {
                     // 尝试查找 synopsis-{chapterId}-{timestamp}.jpg 格式的图片
-                    const possibleSynFiles = Array.from(uploadedFileSet).filter(f => 
+                    const possibleSynFiles = Array.from(uploadedFiles).filter(f => 
                         f.startsWith(`synopsis-${syn.chapterId || syn.id}`)
                     );
                     if (possibleSynFiles.length > 0) {
