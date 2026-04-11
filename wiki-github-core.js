@@ -894,7 +894,6 @@ Object.assign(window.app, {
             
             // 4. 重新保存
             progress.update(90, '保存修复后的数据...');
-            await this.saveDataSimple(progress);
             
             progress.close();
             this.showToast('数据修复完成', 'success');
@@ -2764,13 +2763,17 @@ Object.assign(window.app, {
 
 // 【替换】完整的ZIP导入方法 - 修复图片引用和智能合并
 async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
+    let uploadedCount = 0;
+    let failedImages = [];
+    let truncationFixed = 0;
+    let addedCount = 0;
+    let skipCount = 0;
     const isResuming = resumeFromShard > 0;
     const progress = this.showProgressDialog(
         isResuming ? `继续导入（从第 ${resumeFromShard} 批开始）` : '正在解析...'
     );
     
     let imageFiles = [];
-    let failedImages = [];
     let imageNameMap = new Map(); // 用于跟踪文件名映射
     
     try {
@@ -3003,14 +3006,134 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
         
         console.log(`[Import] 条目统计: 新增 ${addedCount}, 跳过 ${skipCount}, 更新 ${updateCount}`);
 
-        // 步骤 8: 【关键修复】保存数据 - 使用非分片模式避免损坏
-        progress.update(80, '保存到GitHub...');
+        // 步骤 8: 【强制分片】无论数据大小，一律分片保存，彻底规避 409
+        progress.update(80, '正在分片保存数据...');
         
-        // 【重要】导入时暂时禁用分片保存，避免前台模式加载问题
-        const saveResult = await this.saveDataSimple(progress);
-        
-        if (!saveResult.success) {
-            throw new Error('保存失败: ' + saveResult.error);
+        try {
+            const totalEntries = this.data.entries?.length || 0;
+            const ENTRIES_PER_FILE = 8; // 每文件 8 条（保守，降低 409 概率）
+            const totalShards = Math.ceil(totalEntries / ENTRIES_PER_FILE);
+            
+            console.log(`[Import] 强制分片模式: ${totalEntries} 条目 -> ${totalShards} 个文件`);
+            
+            // 先保存基础结构（空 entries，避免 409）
+            const baseData = {
+                version: '2.7.0-sharded',
+                lastUpdate: Date.now(),
+                totalEntries: totalEntries,
+                entryFiles: [], // 先空，后面填充
+                settings: this.data.settings,
+                chapters: this.data.chapters || [],
+                camps: this.data.camps || [],
+                synopsis: this.data.synopsis || [],
+                announcements: this.data.announcements || [],
+                homeContent: this.data.homeContent || [],
+                customFields: this.data.customFields || {}
+            };
+            
+            progress.update(82, '保存索引结构...');
+            
+            // 保存基础结构（最多重试 5 次，递增延迟）
+            let baseSaved = false;
+            for (let attempt = 0; attempt < 5; attempt++) {
+                try {
+                    await this.githubStorage.putFile(
+                        'data.json', 
+                        JSON.stringify(baseData, null, 2), 
+                        'Create index structure', 
+                        false, 
+                        3
+                    );
+                    baseSaved = true;
+                    break;
+                } catch (e) {
+                    console.warn(`[Import] 索引保存尝试 ${attempt + 1}/5 失败:`, e.message);
+                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
+                }
+            }
+            
+            if (!baseSaved) throw new Error('无法保存基础索引，GitHub API 可能受限');
+            
+            // 逐个保存条目分片（关键：每批次后强制延迟）
+            progress.update(85, `开始保存 ${totalShards} 个数据批次...`);
+            
+            for (let i = 0; i < totalEntries; i += ENTRIES_PER_FILE) {
+                const shard = this.data.entries.slice(i, i + ENTRIES_PER_FILE);
+                const shardIndex = Math.floor(i / ENTRIES_PER_FILE);
+                const fileName = `entries-${shardIndex}.json`;
+                
+                console.log(`[Import] 保存分片 ${fileName} (${shard.length} 条目)...`);
+                
+                // 每个分片独立重试
+                let shardSaved = false;
+                for (let retry = 0; retry < 3; retry++) {
+                    try {
+                        await this.githubStorage.putFile(
+                            fileName, 
+                            JSON.stringify(shard, null, 2), 
+                            `Update entries batch ${shardIndex}`, 
+                            false, 
+                            2
+                        );
+                        shardSaved = true;
+                        uploadedCount += shard.length; // 【关键】使用已声明的变量
+                        break;
+                    } catch (e) {
+                        if (e.message && e.message.includes('409')) {
+                            console.warn(`[Import] 分片 ${fileName} 冲突，等待 3 秒后重试...`);
+                            await new Promise(r => setTimeout(r, 3000));
+                        } else {
+                            throw e; // 非 409 错误直接抛出
+                        }
+                    }
+                }
+                
+                if (!shardSaved) {
+                    throw new Error(`分片 ${fileName} 保存失败，请减少导入数量重试`);
+                }
+                
+                // 记录到索引
+                baseData.entryFiles.push(fileName);
+                
+                // 每 3 个分片更新一次索引文件（可选，确保进度不丢）
+                if (shardIndex % 3 === 0 || shardIndex === totalShards - 1) {
+                    try {
+                        await this.githubStorage.putFile(
+                            'data.json', 
+                            JSON.stringify(baseData, null, 2), 
+                            'Update progress', 
+                            false, 
+                            2
+                        );
+                    } catch (e) {
+                        console.warn('[Import] 索引更新失败（非致命）:', e.message);
+                    }
+                }
+                
+                // 【关键】批次间强制延迟 1.5 秒，避免 GitHub 限流
+                if (i + ENTRIES_PER_FILE < totalEntries) {
+                    await new Promise(r => setTimeout(r, 1500));
+                }
+                
+                progress.update(
+                    85 + (12 * (shardIndex + 1) / totalShards), 
+                    `已保存批次 ${shardIndex + 1}/${totalShards}`
+                );
+            }
+            
+            // 最终索引更新
+            progress.update(97, '完成最终索引...');
+            await this.githubStorage.putFile(
+                'data.json', 
+                JSON.stringify(baseData, null, 2), 
+                'Import complete', 
+                false, 
+                3
+            );
+            
+        } catch (error) {
+            console.error('[Import] 分片保存失败:', error);
+            throw error;
         }
 
         // 步骤 9: 最终同步与清理
@@ -3043,8 +3166,6 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
         if (truncationFixed > 0) {
             console.log(`[Import] 修复了 ${truncationFixed} 处文件名截断`);
         }
-        // 再次保存（包含同步后的 synopsis）
-        await this.saveDataSimple(progress);
 
         // 完成
         progress.update(100, '导入完成！');
@@ -3052,10 +3173,11 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
         
         setTimeout(() => progress.close(), 500);
 
-        const msg = [
+            const msg = [
             `导入完成！`,
-            `条目: +${addedCount} 新, 跳过 ${skipCount}${updateCount > 0 ? `, 更新 ${updateCount}` : ''}`,
-            `图片: ${uploadedCount}/${imageFiles.length} 成功${failedImages.length > 0 ? `, ${failedImages.length} 失败` : ''}`
+            `条目: +${addedCount} 新, 跳过 ${skipCount}`,
+            `图片: ${uploadedCount}/${imageFiles.length} 成功${failedImages.length > 0 ? `, ${failedImages.length} 失败` : ''}`,
+            truncationFixed > 0 ? `（修复 ${truncationFixed} 处截断）` : ''
         ].filter(Boolean).join('\n');
 
         // 导入成功后的处理（约第 3110 行附近，成功消息提示之前）
