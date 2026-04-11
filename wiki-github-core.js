@@ -3131,7 +3131,7 @@ async saveDataSimple(progress = null) {
         if (progress) progress.update(85, '写入主数据文件...');
         
         // 使用简单保存（非分片）
-        await this.githubStorage.putFile('data.json', content, 'Update Wiki data (atomic)', false, 5);
+        await this.githubStorage.putFile('data.json', content, 'Update Wiki data (atomic)', false, 10);
         
         if (progress) progress.update(90, '验证保存结果...');
         
@@ -4771,8 +4771,8 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
                         console.warn(`[Wiki] ⚠️ 分片 ${shard.name} 尝试 ${retry + 1}/3 失败:`, e.message);
                         
                         if (retry < 2) {
-                            // 指数退避：1秒, 2秒
-                            const waitTime = 1000 * Math.pow(2, retry);
+                            // 指数退避：3秒, 6秒, 12秒, 24秒, 48秒...（更保守）
+                            const waitTime = Math.min(3000 * Math.pow(2, attempt - 1), 60000);
                             console.log(`[Wiki] 等待 ${waitTime}ms 后重试...`);
                             await new Promise(r => setTimeout(r, waitTime));
                         }
