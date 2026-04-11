@@ -1,8 +1,139 @@
 [
   {
-    "id": "char-1774546471127-uw7uy",
+    "id": "char-1774459740637",
     "type": "character",
-    "code": "C-059",
+    "code": "C-023",
+    "camp": "⌈茶室⌋",
+    "settingType": null,
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774459740637",
+        "title": "什一",
+        "subtitle": "⌈茶室⌋的图书管理员。被拾第一次自世界覆灭中救下的，No_010世界的张可云。\n似乎因为喜欢看书而逐渐遗忘了失去家的痛苦。\n⌈茶室⌋的图书馆向来被拾翻得凌乱，有总是喜欢捧着一本书的什一帮忙，总是件好事。",
+        "level": 2,
+        "image": "{{IMG:char-1774459740637_v-1774459740637_card.jpg}",
+        "images": {
+          "avatar": "{{IMG:char-1774459740637_v-1774459740637_avatar.jpg}",
+          "card": "{{IMG:char-1774459740637_v-1774459740637_card.jpg}",
+          "cover": "{{IMG:char-1774459740637_v-1774459740637_cover.jpg}"
+        },
+        "chapterFrom": "ch-1774459320512",
+        "chapterTo": "ch-1774459973949",
+        "blocks": [],
+        "relatedVersions": [
+          "v-1774459778040"
+        ],
+        "relatedCharacters": [
+          {
+            "charId": "char-1774458852650",
+            "relationName": "师徒"
+          }
+        ],
+        "createdAt": 1774459740637
+      },
+      {
+        "vid": "v-1774459778040",
+        "title": "什一",
+        "subtitle": "⌈茶室⌋的图书馆管理员，No_010世界的张可云。在多次⌈茶室⌋的工作后，似乎学会了不少防身与进攻的手段。\n常袭一身紫袍，所到之处的塞坦残党片甲不留，“江湖”外号“紫袍魔女”......\n呃好吧，如今的她看起来确实得好好休息了。",
+        "level": 2,
+        "image": "{{IMG:char-1774459740637_v-1774459778040_card.jpg}",
+        "images": {
+          "avatar": "{{IMG:char-1774459740637_v-1774459778040_avatar.jpg}",
+          "card": "{{IMG:char-1774459740637_v-1774459778040_card.jpg}",
+          "cover": "{{IMG:char-1774459740637_v-1774459778040_cover.jpg}"
+        },
+        "chapterFrom": "ch-1774459709192",
+        "chapterTo": "ch-1774459664526",
+        "blocks": [],
+        "relatedVersions": [
+          "v-1774459740637",
+          "v-1774459780540"
+        ],
+        "relatedCharacters": [
+          {
+            "charId": "char-1774458852650",
+            "relationName": "师徒"
+          }
+        ],
+        "createdAt": 1774459778040
+      },
+      {
+        "vid": "v-1774459780540",
+        "title": "张可流",
+        "subtitle": "什一，No_010世界的张可云，一个最终找回了“家”与名字的孩子。\n此刻，她与图书管理员脱钩，与“紫袍魔女”脱钩。\n她现在，就是张可流，仅此而已。\n“绵‘流’终降草表歆......”",
+        "level": 1,
+        "image": "{{IMG:char-1774459740637_v-1774459780540_card.jpg}",
+        "images": {
+          "avatar": "{{IMG:char-1774459740637_v-1774459780540_avatar.jpg}",
+          "card": "{{IMG:char-1774459740637_v-1774459780540_card.jpg}",
+          "cover": "{{IMG:char-1774459740637_v-1774459780540_cover.jpg}"
+        },
+        "chapterFrom": "ch-1774459664526",
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [
+          "v-1774459778040"
+        ],
+        "relatedCharacters": [
+          {
+            "charId": "char-1774458852650",
+            "relationName": "师徒"
+          }
+        ],
+        "createdAt": 1774459780540
+      }
+    ]
+  },
+  {
+    "id": "camp-1774544495965",
+    "type": "non-character",
+    "code": "N-010",
+    "settingType": "faction",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "versions": [
+      {
+        "vid": "v-default",
+        "title": "同学组A",
+        "subtitle": "同学组A相关设定",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "阵营简介"
+          },
+          {
+            "type": "p",
+            "text": "这是同学组A的详细介绍。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774544495965
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-zuwzm",
+    "type": "character",
+    "code": "C-025",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -12,8 +143,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-a24ga",
-        "title": "李芸芸",
+        "vid": "v-1774546471127-lxfn1",
+        "title": "老爸",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -31,7 +162,7 @@
           },
           {
             "type": "p",
-            "text": "这是李芸芸的角色词条。"
+            "text": "这是老爸的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -41,9 +172,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-4aoz5",
+    "id": "char-1774546471127-6mpm0",
     "type": "character",
-    "code": "C-060",
+    "code": "C-026",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -53,8 +184,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-z9q70",
-        "title": "张睿祥",
+        "vid": "v-1774546471127-f64zz",
+        "title": "冯程才",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -72,7 +203,7 @@
           },
           {
             "type": "p",
-            "text": "这是张睿祥的角色词条。"
+            "text": "这是冯程才的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -82,9 +213,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-kxobi",
+    "id": "char-1774546471127-68kzu",
     "type": "character",
-    "code": "C-061",
+    "code": "C-027",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -94,8 +225,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-o69xi",
-        "title": "梅友乾",
+        "vid": "v-1774546471127-90sh9",
+        "title": "马米粒",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -113,7 +244,7 @@
           },
           {
             "type": "p",
-            "text": "这是梅友乾的角色词条。"
+            "text": "这是马米粒的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -123,9 +254,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-5k8t4",
+    "id": "char-1774546471127-cyrwx",
     "type": "character",
-    "code": "C-062",
+    "code": "C-028",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -135,8 +266,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-o6acy",
-        "title": "刀钟声",
+        "vid": "v-1774546471127-m56cr",
+        "title": "张桥",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -154,7 +285,7 @@
           },
           {
             "type": "p",
-            "text": "这是刀钟声的角色词条。"
+            "text": "这是张桥的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -164,9 +295,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-53ct5",
+    "id": "char-1774546471127-guldb",
     "type": "character",
-    "code": "C-063",
+    "code": "C-029",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -176,8 +307,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-9ewt8",
-        "title": "锥哥",
+        "vid": "v-1774546471127-z13mr",
+        "title": "杨克妙",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -195,7 +326,7 @@
           },
           {
             "type": "p",
-            "text": "这是锥哥的角色词条。"
+            "text": "这是杨克妙的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -205,9 +336,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-vwtil",
+    "id": "char-1774546471127-fhkpf",
     "type": "character",
-    "code": "C-064",
+    "code": "C-030",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -217,8 +348,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-7nq16",
-        "title": "苏北溪",
+        "vid": "v-1774546471127-onbek",
+        "title": "马四季",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -236,335 +367,7 @@
           },
           {
             "type": "p",
-            "text": "这是苏北溪的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-h46x6",
-    "type": "character",
-    "code": "C-065",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-tst8t",
-        "title": "马大钊",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是马大钊的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-bqswl",
-    "type": "character",
-    "code": "C-066",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-yu8ug",
-        "title": "郑班长",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是郑班长的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-xflm8",
-    "type": "character",
-    "code": "C-067",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-r1oka",
-        "title": "卖米线的阿姨",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是卖米线的阿姨的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-jfq9d",
-    "type": "character",
-    "code": "C-068",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-vjwej",
-        "title": "保安",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是保安的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-1rmwq",
-    "type": "character",
-    "code": "C-069",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-bf17s",
-        "title": "董加法",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是董加法的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-37jhx",
-    "type": "character",
-    "code": "C-070",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-wg8im",
-        "title": "邱丘人",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是邱丘人的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-mhuoc",
-    "type": "character",
-    "code": "C-071",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-9gla6",
-        "title": "宋罗汤",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是宋罗汤的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-r9kwo",
-    "type": "character",
-    "code": "C-072",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-p3314",
-        "title": "马文一",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是马文一的角色词条。"
+            "text": "这是马四季的角色词条。"
           }
         ],
         "relatedVersions": [],
