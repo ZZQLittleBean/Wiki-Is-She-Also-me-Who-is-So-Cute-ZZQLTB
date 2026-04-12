@@ -203,6 +203,11 @@ Object.assign(window.app, {
     
     // 确保默认节点存在
     ensureDefaultNodes() {
+        // 【修复2】确保 timelineNodes 始终存在
+        if (!this.data.timelineNodes || !Array.isArray(this.data.timelineNodes)) {
+            this.data.timelineNodes = [];
+        }
+        
         // 如果没有设置最新节点，自动选择order最大的节点
         if (!this.data.latestNodeId && this.data.timelineNodes.length > 0) {
             const sorted = [...this.data.timelineNodes].sort((a, b) => b.order - a.order);
@@ -218,15 +223,20 @@ Object.assign(window.app, {
     // 获取当前应显示的节点ID
     getCurrentNodeId() {
         if (this.data.currentTimelineNode === 'latest') {
+            // 【修复7】确保 latestNodeId 有值，否则返回 'all' 避免报错
             return this.data.latestNodeId || 'all';
         }
-        return this.data.currentTimelineNode;
+        return this.data.currentTimelineNode || 'all';
     },
 
     // 获取当前节点对象
     getCurrentNode() {
         const nodeId = this.getCurrentNodeId();
         if (nodeId === 'all') return null;
+        // 【修复】确保 timelineNodes 存在
+        if (!this.data.timelineNodes || !Array.isArray(this.data.timelineNodes)) {
+            return null;
+        }
         return this.data.timelineNodes.find(n => n.id === nodeId);
     },
 
@@ -435,6 +445,19 @@ Object.assign(window.app, {
                 customFields: baseData.customFields || {},
                 entries: entries  // 确保这行在调用 resolveImageReferences 之前执行
             };
+            // 【修复3】确保关键字段存在，防止后续操作报错
+            this.data.timelineNodes = this.data.timelineNodes || [];
+            this.data.newReaderNodeId = this.data.newReaderNodeId || null;
+            this.data.latestNodeId = this.data.latestNodeId || null;
+            this.data.currentTimelineNode = this.data.currentTimelineNode || 'latest';
+
+            // 【修复4】导入后立即执行数据修复（内嵌三段控制台代码的功能）
+            console.log('[Wiki] 执行导入后数据修复...');
+            this.ensureDefaultNodes();  // 确保默认节点
+            const validation = this.validateAndFixData();  // 执行截断修复
+            if (validation.fixed > 0) {
+                console.log(`[Wiki] 导入时自动修复了 ${validation.fixed} 处数据异常`);
+            }
             
             console.log('[Wiki] 数据合并完成，条目数:', this.data.entries.length);
             
@@ -496,6 +519,14 @@ Object.assign(window.app, {
             this.applyFont();
             this.updateUIForMode();
             this.router('home');
+            // 数据合并完成后，确保所有关键字段存在
+            this.data.timelineNodes = this.data.timelineNodes || [];
+            this.data.newReaderNodeId = this.data.newReaderNodeId || null;
+            this.data.latestNodeId = this.data.latestNodeId || null;
+            this.data.currentTimelineNode = this.data.currentTimelineNode || 'latest';
+            
+            // 确保默认节点
+            this.ensureDefaultNodes();
             
         } catch (error) {
             console.error('[Wiki] ❌ 加载失败:', error);
@@ -958,6 +989,11 @@ Object.assign(window.app, {
             customFields: {},
             currentTimeline: 'latest',
             currentMode: 'view',
+            // 【修复1】添加时间节点相关字段初始化，防止 undefined 错误
+            timelineNodes: [],
+            newReaderNodeId: null,
+            latestNodeId: null,
+            currentTimelineNode: 'latest',
             settings: {
                 name: '未命名 Wiki',
                 subtitle: '',
@@ -1175,6 +1211,10 @@ Object.assign(window.app, {
     },
 
     renderList(container, type) {
+        // 【修复8】确保时间节点数据存在
+        if (!this.data.timelineNodes) {
+            this.data.timelineNodes = [];
+        }
         const tpl = document.getElementById('tpl-list');
         if (!tpl) return;
         
@@ -2760,22 +2800,23 @@ Object.assign(window.app, {
         // ========== ZIP 文件导入（新增/恢复）==========
     
     // 完整的 importZipFile 方法（替换 wiki-github-core.js 中的原有方法）
-
-// 【替换】完整的ZIP导入方法 - 修复图片引用和智能合并
+// 【完整替换】importZipFile 方法 - 修复变量重复声明和执行顺序问题
 async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
+    // 【关键修复】所有变量仅在函数开头声明一次，避免重复声明
     let uploadedCount = 0;
     let failedImages = [];
     let truncationFixed = 0;
     let addedCount = 0;
     let skipCount = 0;
+    let updateCount = 0;
+    let imageFiles = [];
+    let uploadedFileSet = new Set(); // 【提前声明】用于后续图片引用匹配
+    
     const isResuming = resumeFromShard > 0;
     const progress = this.showProgressDialog(
         isResuming ? `继续导入（从第 ${resumeFromShard} 批开始）` : '正在解析...'
     );
-    
-    let imageFiles = [];
-    let imageNameMap = new Map(); // 用于跟踪文件名映射
-    
+
     try {
         // 步骤 1: 解析 ZIP
         progress.update(5, '解析ZIP文件...');
@@ -2792,7 +2833,7 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             throw new Error('没有可导入的词条');
         }
 
-        // 步骤 2: 提取图片文件列表（包含子目录）
+        // 步骤 2: 提取图片文件列表
         imageFiles = Object.keys(zip.files).filter(name => {
             const file = zip.files[name];
             return !file.dir && (
@@ -2836,14 +2877,13 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             };
             this.data.settings = { ...this.data.settings, ...settings };
 
-            // 【关键修复】强制合并 homeContent，无论模式如何
+            // 【关键】合并 homeContent
             const importedHomeContent = importedData.homeContent || importedData.data?.homeContent || [];
             console.log(`[Import] 发现 homeContent: ${importedHomeContent.length} 项`);
             
             if (mode === 'replace') {
                 this.data.homeContent = importedHomeContent;
             } else {
-                // 智能合并：保留现有，添加新的（基于 id 或内容去重）
                 const existingKeys = new Set(this.data.homeContent.map(i => 
                     i.entryId || i.content?.substring(0, 20) || Math.random()
                 ));
@@ -2855,25 +2895,21 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                     }
                 });
             }
-            console.log(`[Import] 合并后 homeContent: ${this.data.homeContent.length} 项`);
 
-            // 【关键修复】强制合并 synopsis（剧情梗概）
+            // 【关键】合并 synopsis
             const importedSynopsis = importedData.synopsis || importedData.data?.synopsis || [];
             if (mode === 'replace') {
                 this.data.synopsis = importedSynopsis;
             } else {
-                // 智能合并：保留现有内容，添加新的
                 const existingSynMap = {};
                 this.data.synopsis.forEach(s => { if(s.chapterId) existingSynMap[s.chapterId] = s; });
                 
                 importedSynopsis.forEach(syn => {
                     if (!syn.chapterId) return;
-                    
                     if (!existingSynMap[syn.chapterId]) {
                         this.data.synopsis.push(syn);
                         existingSynMap[syn.chapterId] = syn;
                     } else {
-                        // 更新时保留非空内容
                         const existing = existingSynMap[syn.chapterId];
                         if (syn.content?.trim() && !syn.content.includes('暂无内容')) {
                             existing.content = syn.content;
@@ -2881,14 +2917,11 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                         if (syn.image && syn.image.includes('IMG:')) {
                             existing.image = syn.image;
                         }
-                        if (syn.title?.trim() && !syn.title.startsWith('第')) {
-                            existing.title = syn.title;
-                        }
                     }
                 });
             }
 
-            // 合并其他数据...
+            // 合并其他数据
             const mergeArray = (target, source, key = 'id') => {
                 if (!source) return;
                 const existing = new Set(target.map(i => i[key]));
@@ -2901,52 +2934,144 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             mergeArray(this.data.camps, importedData.camps || importedData.data?.camps);
             mergeArray(this.data.announcements, importedData.announcements || importedData.data?.announcements);
 
-            // 【关键】导入后立即同步剧情梗概与章节
+            // 导入后立即同步剧情梗概与章节
             this.syncSynopsisWithChapters();
         }
 
-        // 【步骤 5】处理图片后，构建统一的文件集合（修正变量名并防截断）
-        const uploadedFileSet = new Set();
+        // 【关键修复】步骤 4.5: 先处理图片上传，填充 uploadedFileSet
+        progress.update(35, `正在上传 ${imageFiles.length} 张图片...`);
+        
         for (const imgPath of imageFiles) {
             let filename = imgPath.replace(/^images\//, '').replace(/^\/?/, '');
-            // 【整合第三段代码】预防性修复：.jp → .jpg
+            
+            // 预防性修复：.jp → .jpg
             if (filename.endsWith('.jp') && !filename.endsWith('.jpg')) {
                 filename += 'g';
+                truncationFixed++;
             }
-            if (!failedImages.includes(filename)) {
-                uploadedFileSet.add(filename);
+            
+            try {
+                const arrayBuffer = await zip.file(imgPath).async('arraybuffer');
+                const blob = new Blob([arrayBuffer]);
+                
+                const dataUrl = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onload = (e) => resolve(e.target.result);
+                    reader.readAsDataURL(blob);
+                });
+                
+                // 压缩并上传
+                const compressed = await this.compressImageIfNeeded(dataUrl, 1920, 1080, 0.85, 2);
+                await this.githubStorage.saveImage(filename, compressed);
+                uploadedCount++;
+                uploadedFileSet.add(filename); // 【关键】记录成功上传的文件
+                
+            } catch (e) {
+                console.warn(`[Import] 图片上传失败 ${filename}:`, e);
+                failedImages.push(filename);
+            }
+            
+            // 每5张图片更新一次进度
+            if (uploadedCount % 5 === 0) {
+                progress.update(35 + (20 * uploadedCount / imageFiles.length), `已上传 ${uploadedCount}/${imageFiles.length} 张...`);
             }
         }
 
-        // 【步骤 5.5 替代原有逻辑】强制建立图片引用（整合第一段代码）
-        progress.update(45, '建立图片引用映射...');
+        console.log(`[Import] 图片上传完成: ${uploadedCount} 成功, ${failedImages.length} 失败`);
+
+        // 【关键修复】步骤 5: 图片引用处理三部曲（现在 uploadedFileSet 已就绪）
+
+        // 5.1 建立 {{IMG:...}} 引用（第一段控制台代码逻辑）
+        progress.update(55, '建立图片引用映射...');
         entries.forEach(entry => {
             if (!entry.versions) return;
             entry.versions.forEach(v => {
-                // 强制初始化 images 对象（清除旧的 null/base64/错误数据）
-                v.images = { avatar: null, card: null, cover: null };
+                // 强制初始化 images 对象
+                if (!v.images || typeof v.images !== 'object') {
+                    v.images = { avatar: null, card: null, cover: null };
+                }
                 
-                // 预期的标准文件名
+                // 清除旧的无效数据（base64/blob）
+                ['avatar', 'card', 'cover'].forEach(type => {
+                    const val = v.images[type];
+                    if (val && (val.startsWith('data:') || val.startsWith('blob:'))) {
+                        v.images[type] = null;
+                    }
+                });
+                
+                // 匹配远程文件建立引用
                 const patterns = {
                     avatar: `${entry.id}_${v.vid}_avatar.jpg`,
                     card: `${entry.id}_${v.vid}_card.jpg`,
                     cover: `${entry.id}_${v.vid}_cover.jpg`
                 };
                 
-                // 智能匹配：检查该文件是否已成功上传
                 ['avatar', 'card', 'cover'].forEach(type => {
                     const expectedFile = patterns[type];
                     if (uploadedFileSet.has(expectedFile)) {
                         v.images[type] = `{{IMG:${expectedFile}}`;
+                        console.log(`[Import] 建立引用: ${entry.code} -> ${expectedFile}`);
                     }
                 });
                 
-                // 同步旧版 image 字段（优先使用 card）
-                v.image = v.images.card || v.images.avatar || v.images.cover || null;
+                // 同步旧版 image 字段
+                v.image = v.images.card || v.images.avatar || v.images.cover || v.image;
             });
         });
 
-        // 【步骤 6】处理 synopsis 图片（使用已定义的 uploadedFileSet）
+        // 5.2 解析为完整 URL（第二段控制台代码逻辑）
+        progress.update(60, '解析图片引用...');
+        this.resolveImageReferences();
+
+        // 5.3 深度修复截断（第三段控制台代码逻辑）
+        progress.update(65, '检查文件名截断...');
+        let deepFixed = 0;
+        entries.forEach(entry => {
+            if (!entry.versions) return;
+            entry.versions.forEach(v => {
+                if (!v.images) return;
+                
+                ['avatar', 'card', 'cover'].forEach(type => {
+                    let val = v.images[type];
+                    if (!val || typeof val !== 'string') return;
+                    
+                    let original = val;
+                    let changed = false;
+                    
+                    // 场景1: URL 以 .jp 结尾
+                    if (val.endsWith('.jp') && !val.endsWith('.jpg')) {
+                        val = val + 'g';
+                        changed = true;
+                    }
+                    // 场景2: {{IMG:...}} 内被截断
+                    else if (val.includes('{{IMG:') && val.endsWith('.jp}}')) {
+                        val = val.slice(0, -5) + '.jpg}}';
+                        changed = true;
+                    }
+                    // 场景3: 中间截断
+                    else if (val.includes('.jp/') || val.includes('.jp?') || /\.jp[^a-z]/.test(val)) {
+                        val = val.replace(/\.jp([^a-z]|$)/g, '.jpg$1');
+                        changed = true;
+                    }
+                    
+                    if (changed) {
+                        v.images[type] = val;
+                        deepFixed++;
+                        console.log(`[Import] 修复截断: ${entry.code}.${type}`);
+                    }
+                });
+                
+                // 重新同步
+                v.image = v.images?.card || v.images?.avatar || v.images?.cover || v.image;
+            });
+        });
+
+        if (deepFixed > 0) {
+            console.log(`[Import] 深度修复了 ${deepFixed} 处截断`);
+            this.resolveImageReferences(); // 重新解析
+        }
+
+        // 处理 synopsis 图片引用
         if (importedData.synopsis) {
             importedData.synopsis.forEach(syn => {
                 if (!syn.image || syn.image.startsWith('data:')) {
@@ -2961,16 +3086,13 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             });
         }
 
-        // 步骤 7: 合并 entries（智能去重）
-        progress.update(60, '合并词条数据...');
+        // 步骤 6: 合并 entries
+        progress.update(75, '合并词条数据...');
         const existingIds = new Set(this.data.entries.map(e => e.id));
-        let addedCount = 0;
-        let skipCount = 0;
-        let updateCount = 0;
         
         for (const entry of entries) {
             if (!existingIds.has(entry.id)) {
-                // 清理 entry 中的内嵌图片，避免数据过大
+                // 清理内嵌 base64
                 if (entry.versions) {
                     entry.versions.forEach(v => {
                         if (v.image && v.image.startsWith('data:')) v.image = null;
@@ -2984,230 +3106,137 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                 this.data.entries.push(entry);
                 existingIds.add(entry.id);
                 addedCount++;
-            } else {
-                // 【新增】智能更新：如果条目已存在，可选择更新（保留版本历史）
-                if (mode === 'merge-update') {
-                    const idx = this.data.entries.findIndex(e => e.id === entry.id);
-                    if (idx >= 0 && entry.versions) {
-                        // 合并版本历史
-                        const existingVersions = this.data.entries[idx].versions || [];
-                        const existingVids = new Set(existingVersions.map(v => v.vid));
-                        entry.versions.forEach(v => {
-                            if (!existingVids.has(v.vid)) {
-                                existingVersions.push(v);
-                            }
-                        });
-                        updateCount++;
-                    }
+            } else if (mode === 'merge-update') {
+                // 智能合并版本历史
+                const idx = this.data.entries.findIndex(e => e.id === entry.id);
+                if (idx >= 0 && entry.versions) {
+                    const existingVersions = this.data.entries[idx].versions || [];
+                    const existingVids = new Set(existingVersions.map(v => v.vid));
+                    entry.versions.forEach(v => {
+                        if (!existingVids.has(v.vid)) {
+                            existingVersions.push(v);
+                        }
+                    });
+                    updateCount++;
                 }
+            } else {
                 skipCount++;
             }
         }
-        
+
+        // 【关键】确保时间节点数据存在并初始化
+        this.data.timelineNodes = this.data.timelineNodes || [];
+        this.data.newReaderNodeId = this.data.newReaderNodeId || null;
+        this.data.latestNodeId = this.data.latestNodeId || null;
+        this.ensureDefaultNodes(); // 【确保】在此处调用
+
         console.log(`[Import] 条目统计: 新增 ${addedCount}, 跳过 ${skipCount}, 更新 ${updateCount}`);
 
-        // 步骤 8: 【强制分片】无论数据大小，一律分片保存，彻底规避 409
-        progress.update(80, '正在分片保存数据...');
+        // 步骤 7: 保存数据（分片保存逻辑）
+        progress.update(85, '正在保存数据...');
         
-        try {
-            const totalEntries = this.data.entries?.length || 0;
-            const ENTRIES_PER_FILE = 8; // 每文件 8 条（保守，降低 409 概率）
-            const totalShards = Math.ceil(totalEntries / ENTRIES_PER_FILE);
+        const ENTRIES_PER_FILE = 20;
+        const totalEntries = this.data.entries.length;
+        const totalShards = Math.ceil(totalEntries / ENTRIES_PER_FILE);
+        
+        const baseData = {
+            version: '2.7.0-sharded',
+            lastUpdate: Date.now(),
+            totalEntries: totalEntries,
+            entryFiles: [],
+            settings: this.data.settings,
+            chapters: this.data.chapters || [],
+            camps: this.data.camps || [],
+            synopsis: this.data.synopsis || [],
+            announcements: this.data.announcements || [],
+            homeContent: this.data.homeContent || [],
+            customFields: this.data.customFields || {},
+            // 【关键】保存时间节点数据
+            timelineNodes: this.data.timelineNodes || [],
+            newReaderNodeId: this.data.newReaderNodeId,
+            latestNodeId: this.data.latestNodeId
+        };
+
+        // 先保存基础结构
+        await this.githubStorage.putFile(
+            'data.json', 
+            JSON.stringify(baseData, null, 2), 
+            'Create index structure'
+        );
+
+        // 分片保存 entries（带延迟）
+        for (let i = 0; i < totalEntries; i += ENTRIES_PER_FILE) {
+            const shard = this.data.entries.slice(i, i + ENTRIES_PER_FILE);
+            const shardIndex = Math.floor(i / ENTRIES_PER_FILE);
+            const fileName = `entries-${shardIndex}.json`;
             
-            console.log(`[Import] 强制分片模式: ${totalEntries} 条目 -> ${totalShards} 个文件`);
-            
-            // 先保存基础结构（空 entries，避免 409）
-            const baseData = {
-                version: '2.7.0-sharded',
-                lastUpdate: Date.now(),
-                totalEntries: totalEntries,
-                entryFiles: [], // 先空，后面填充
-                settings: this.data.settings,
-                chapters: this.data.chapters || [],
-                camps: this.data.camps || [],
-                synopsis: this.data.synopsis || [],
-                announcements: this.data.announcements || [],
-                homeContent: this.data.homeContent || [],
-                customFields: this.data.customFields || {}
-            };
-            
-            progress.update(82, '保存索引结构...');
-            
-            // 保存基础结构（最多重试 5 次，递增延迟）
-            let baseSaved = false;
-            for (let attempt = 0; attempt < 5; attempt++) {
-                try {
-                    await this.githubStorage.putFile(
-                        'data.json', 
-                        JSON.stringify(baseData, null, 2), 
-                        'Create index structure', 
-                        false, 
-                        3
-                    );
-                    baseSaved = true;
-                    break;
-                } catch (e) {
-                    console.warn(`[Import] 索引保存尝试 ${attempt + 1}/5 失败:`, e.message);
-                    await new Promise(r => setTimeout(r, 2000 * (attempt + 1)));
-                }
-            }
-            
-            if (!baseSaved) throw new Error('无法保存基础索引，GitHub API 可能受限');
-            
-            // 逐个保存条目分片（关键：每批次后强制延迟）
-            progress.update(85, `开始保存 ${totalShards} 个数据批次...`);
-            
-            for (let i = 0; i < totalEntries; i += ENTRIES_PER_FILE) {
-                const shard = this.data.entries.slice(i, i + ENTRIES_PER_FILE);
-                const shardIndex = Math.floor(i / ENTRIES_PER_FILE);
-                const fileName = `entries-${shardIndex}.json`;
-                
-                console.log(`[Import] 保存分片 ${fileName} (${shard.length} 条目)...`);
-                
-                // 每个分片独立重试
-                let shardSaved = false;
-                for (let retry = 0; retry < 3; retry++) {
-                    try {
-                        await this.githubStorage.putFile(
-                            fileName, 
-                            JSON.stringify(shard, null, 2), 
-                            `Update entries batch ${shardIndex}`, 
-                            false, 
-                            2
-                        );
-                        shardSaved = true;
-                        uploadedCount += shard.length; // 【关键】使用已声明的变量
-                        break;
-                    } catch (e) {
-                        if (e.message && e.message.includes('409')) {
-                            console.warn(`[Import] 分片 ${fileName} 冲突，等待 3 秒后重试...`);
-                            await new Promise(r => setTimeout(r, 3000));
-                        } else {
-                            throw e; // 非 409 错误直接抛出
-                        }
-                    }
-                }
-                
-                if (!shardSaved) {
-                    throw new Error(`分片 ${fileName} 保存失败，请减少导入数量重试`);
-                }
-                
-                // 记录到索引
-                baseData.entryFiles.push(fileName);
-                
-                // 每 3 个分片更新一次索引文件（可选，确保进度不丢）
-                if (shardIndex % 3 === 0 || shardIndex === totalShards - 1) {
-                    try {
-                        await this.githubStorage.putFile(
-                            'data.json', 
-                            JSON.stringify(baseData, null, 2), 
-                            'Update progress', 
-                            false, 
-                            2
-                        );
-                    } catch (e) {
-                        console.warn('[Import] 索引更新失败（非致命）:', e.message);
-                    }
-                }
-                
-                // 【关键】批次间强制延迟 1.5 秒，避免 GitHub 限流
-                if (i + ENTRIES_PER_FILE < totalEntries) {
-                    await new Promise(r => setTimeout(r, 1500));
-                }
-                
-                progress.update(
-                    85 + (12 * (shardIndex + 1) / totalShards), 
-                    `已保存批次 ${shardIndex + 1}/${totalShards}`
-                );
-            }
-            
-            // 最终索引更新
-            progress.update(97, '完成最终索引...');
             await this.githubStorage.putFile(
-                'data.json', 
-                JSON.stringify(baseData, null, 2), 
-                'Import complete', 
-                false, 
-                3
+                fileName, 
+                JSON.stringify(shard, null, 2), 
+                `Update entries batch ${shardIndex}`
             );
             
-        } catch (error) {
-            console.error('[Import] 分片保存失败:', error);
-            throw error;
+            baseData.entryFiles.push(fileName);
+            
+            // 更新进度
+            progress.update(
+                85 + (10 * (shardIndex + 1) / totalShards), 
+                `保存批次 ${shardIndex + 1}/${totalShards}...`
+            );
+            
+            // 批次间延迟避免限流
+            if (i + ENTRIES_PER_FILE < totalEntries) {
+                await new Promise(r => setTimeout(r, 1500));
+            }
         }
 
-        // 步骤 9: 最终同步与清理
-        progress.update(95, '同步剧情梗概...');
-        this.syncSynopsisWithChapters();
-        // 【整合第三段代码】导入后深度修复截断（作为保险机制）
-        progress.update(88, '校验文件名完整性...');
-        let truncationFixed = 0;
-        this.data.entries.forEach(entry => {
-            if (!entry.versions) return;
-            entry.versions.forEach(v => {
-                if (!v.images) return;
-                ['avatar', 'card', 'cover'].forEach(type => {
-                    let val = v.images[type];
-                    if (!val || typeof val !== 'string') return;
-                    
-                    // 检测 {{IMG:...}} 格式内被截断为 .jp}}
-                    if (val.includes('{{IMG:') && val.endsWith('.jp}}')) {
-                        v.images[type] = val.slice(0, -5) + '.jpg}}';
-                        truncationFixed++;
-                    }
-                    // 检测其他 .jp 截断变体
-                    else if (val.endsWith('.jp') && !val.endsWith('.jpg')) {
-                        v.images[type] = val + 'g';
-                        truncationFixed++;
-                    }
-                });
-            });
-        });
-        if (truncationFixed > 0) {
-            console.log(`[Import] 修复了 ${truncationFixed} 处文件名截断`);
-        }
+        // 更新最终索引
+        await this.githubStorage.putFile(
+            'data.json', 
+            JSON.stringify(baseData, null, 2), 
+            'Import complete'
+        );
+
+        // 最终确保时间节点（双重保险）
+        this.ensureDefaultNodes();
 
         // 完成
         progress.update(100, '导入完成！');
         localStorage.removeItem('wiki_import_progress');
-        
         setTimeout(() => progress.close(), 500);
 
-            const msg = [
+        // 构建结果消息
+        const msgLines = [
             `导入完成！`,
-            `条目: +${addedCount} 新, 跳过 ${skipCount}`,
+            `条目: +${addedCount} 新, 跳过 ${skipCount}${updateCount > 0 ? `, 更新 ${updateCount}` : ''}`,
             `图片: ${uploadedCount}/${imageFiles.length} 成功${failedImages.length > 0 ? `, ${failedImages.length} 失败` : ''}`,
-            truncationFixed > 0 ? `（修复 ${truncationFixed} 处截断）` : ''
-        ].filter(Boolean).join('\n');
+            deepFixed > 0 ? `（修复 ${deepFixed} 处截断）` : ''
+        ].filter(Boolean);
+        
+        this.showAlertDialog({
+            title: '导入成功',
+            message: msgLines.join('\n'),
+            type: 'success'
+        });
 
-        // 导入成功后的处理（约第 3110 行附近，成功消息提示之前）
-        progress.update(95, '刷新图片显示...');
-
-        // 【整合第二段代码】立即解析所有 {{IMG:...}} 为完整 URL
+        // 刷新显示
         this.resolveImageReferences();
-
-        // 刷新当前页面以显示图片
         this.router(this.data.currentTarget || 'home', false);
-
-        // 延迟执行二次刷新（确保GitHub Raw URL生效）
+        
+        // 延迟二次刷新确保GitHub Raw生效
         setTimeout(() => {
             this.resolveImageReferences();
             this.router(this.data.currentTarget || 'home', false);
         }, 1000);
 
-        this.showAlertDialog({
-            title: '导入成功',
-            message: msg + (truncationFixed > 0 ? `\n\n（自动修复了 ${truncationFixed} 个文件名截断）` : ''),
-            type: 'success'
-        });
-
-        // 重新加载数据以解析图片引用
+        // 重新加载验证
         await this.loadDataFromGitHub();
         
     } catch (error) {
         progress.close();
         console.error('[Import] 失败:', error);
         
+        // 保存进度逻辑
         if (confirm(`导入失败: ${error.message}\n\n是否保存进度以便稍后继续？`)) {
             localStorage.setItem('wiki_import_progress', JSON.stringify({
                 filename: zipFile.name,
