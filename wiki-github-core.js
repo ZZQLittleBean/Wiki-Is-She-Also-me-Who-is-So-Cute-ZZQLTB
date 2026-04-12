@@ -3106,20 +3106,46 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                 this.data.entries.push(entry);
                 existingIds.add(entry.id);
                 addedCount++;
+            // 【修正】完整替换 merge-update 逻辑块（注意 else if 语法）
             } else if (mode === 'merge-update') {
-                // 智能合并版本历史
-                const idx = this.data.entries.findIndex(e => e.id === entry.id);
-                if (idx >= 0 && entry.versions) {
-                    const existingVersions = this.data.entries[idx].versions || [];
-                    const existingVids = new Set(existingVersions.map(v => v.vid));
-                    entry.versions.forEach(v => {
-                        if (!existingVids.has(v.vid)) {
-                            existingVersions.push(v);
+                // 智能合并：追加新版本 + 更新已变更的旧版本
+                const existingIndex = this.data.entries.findIndex(e => e.id === entry.id);
+                if (existingIndex >= 0 && entry.versions) {
+                    const existingEntry = this.data.entries[existingIndex];
+                    const existingVersions = existingEntry.versions || [];
+                    
+                    entry.versions.forEach(newVersion => {
+                        const existingVersionIndex = existingVersions.findIndex(v => v.vid === newVersion.vid);
+                        
+                        if (existingVersionIndex === -1) {
+                            // 情况1：全新版本，追加
+                            existingVersions.push(newVersion);
+                            addedCount++;
+                        } else {
+                            // 情况2：版本已存在，检查内容是否变化
+                            const oldVersion = existingVersions[existingVersionIndex];
+                            const hasChanged = this.hasVersionContentChanged(oldVersion, newVersion);
+                            
+                            if (hasChanged) {
+                                // 保留创建时间，更新内容字段，添加更新时间戳
+                                const createdAt = oldVersion.createdAt || Date.now();
+                                Object.assign(existingVersions[existingVersionIndex], newVersion, {
+                                    createdAt: createdAt,      // 保留原始创建时间
+                                    updatedAt: Date.now()      // 标记更新时间
+                                });
+                                updateCount++;
+                                console.log(`[Import] 更新版本 ${entry.code}/${newVersion.vid}: 内容已变更`);
+                            }
                         }
                     });
-                    updateCount++;
+                } else if (existingIndex === -1) {
+                    // 情况3：全新条目，直接添加
+                    this.data.entries.push(entry);
+                    addedCount++;
                 }
+                // 【关键】保留 else 分支，即使为空也要有，确保语法完整
             } else {
+                // 默认逻辑（保底）
                 skipCount++;
             }
         }
@@ -4280,7 +4306,28 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
         URL.revokeObjectURL(url);
         this.showToast('备份已导出', 'success');
     },
-
+    // 【新增】版本内容变更检测（放在 app 对象内任意方法外部）
+    hasVersionContentChanged(oldV, newV) {
+        if (!oldV || !newV) return true;
+        
+        // 对比关键字段：标题、题记、等级、正文块、图片引用
+        const criticalFields = ['title', 'subtitle', 'level'];
+        for (const field of criticalFields) {
+            if ((oldV[field] || '') !== (newV[field] || '')) return true;
+        }
+        
+        // 对比图片引用（处理对象和字符串两种情况）
+        const oldImages = JSON.stringify(oldV.images || {});
+        const newImages = JSON.stringify(newV.images || {});
+        if (oldImages !== newImages) return true;
+        
+        // 对比正文块（数组深比较）
+        const oldBlocks = JSON.stringify(oldV.blocks || []);
+        const newBlocks = JSON.stringify(newV.blocks || []);
+        if (oldBlocks !== newBlocks) return true;
+        
+        return false;
+    },
     // ========== 字体设置 ==========
     changeFont(font) {
         this.data.fontFamily = font;
