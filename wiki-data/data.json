@@ -1,6 +1,6 @@
 {
   "version": "2.7.0-sharded",
-  "lastUpdate": 1776078020490,
+  "lastUpdate": 1776078076112,
   "totalEntries": 74,
   "entryFiles": [
     "entries-0.json",
@@ -629,24 +629,22 @@
     {
       "type": "entry-ref",
       "entryId": "char-xiaoli",
-      "title": "张可云"
-    },
-    {
-      "type": "entry-ref",
-      "entryId": "char-protagonist",
-      "title": "张可颂"
-    },
-    {
-      "type": "text",
-      "content": "这里是主页自定义内容，未来我会在这里提供更多内容供读者参考。"
-    },
-    {
-      "type": "entry-ref",
-      "entryId": "char-xiaoli",
       "versionId": "v-1774543291292",
       "title": "张可云",
       "badgeText": "--当前状态--",
       "badgeClass": "bg-yellow-500 text-white"
+    },
+    {
+      "type": "entry-ref",
+      "entryId": "char-protagonist",
+      "versionId": "v-default",
+      "title": "张可颂",
+      "badgeText": "",
+      "badgeClass": ""
+    },
+    {
+      "type": "text",
+      "content": "这里是主页自定义内容，未来我会在这里提供更多内容供读者参考。"
     }
   ],
   "customFields": {}
