@@ -869,26 +869,49 @@ Object.assign(window.app, {
                     return;
                 }
                 
-                const version = this.getVisibleVersion(entry);
+                // 【同步】优先使用定向版本，否则使用当前可见版本
+                let version = null;
+                if (item.versionId) {
+                    version = entry.versions.find(v => v.vid === item.versionId);
+                }
+                if (!version) {
+                    version = this.getVisibleVersion(entry);
+                }
                 const displayTitle = item.title || version?.title || entry.code;
                 
                 const div = document.createElement('div');
                 div.className = 'bg-indigo-50 p-3 rounded-xl border border-indigo-100 cursor-pointer hover:bg-indigo-100 transition flex items-center gap-3';
-                div.onclick = () => this.openEntry(entry.id);
+                
+                // 【同步】如果有指定版本ID，使用定向跳转
+                if (item.versionId) {
+                    div.onclick = () => this.openEntryWithVersion(entry.id, item.versionId);
+                } else {
+                    div.onclick = () => this.openEntry(entry.id);
+                }
+                
+                // 【同步】构建徽章HTML（蓝底白字、黄底白字、灰底白字）
+                let badgeHtml = '';
+                if (item.badgeText && item.badgeClass) {
+                    // 确保类名中包含 text-white 以保证白字
+                    const badgeClass = item.badgeClass.includes('text-white') ? item.badgeClass : `${item.badgeClass} text-white`;
+                    badgeHtml = `<span class="${badgeClass} text-[10px] px-2 py-0.5 rounded font-medium whitespace-nowrap">${item.badgeText}</span>`;
+                }
                 
                 if (this.runMode === 'backend') {
                     div.innerHTML = `
-                        <i class="fa-solid fa-book text-indigo-500"></i>
+                        <i class="fa-solid fa-book text-indigo-500 shrink-0"></i>
                         <span class="font-medium text-indigo-700 flex-1 truncate">${this.escapeHtml(displayTitle)}</span>
-                        <button onclick="event.stopPropagation(); app.removeHomeItem(${idx})" class="text-gray-400 hover:text-red-500 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition">
+                        ${badgeHtml ? `<div class="ml-auto mr-1">${badgeHtml}</div>` : ''}
+                        <button onclick="event.stopPropagation(); app.removeHomeItem(${idx})" class="text-gray-400 hover:text-red-500 w-6 h-6 flex items-center justify-center rounded-full hover:bg-white transition shrink-0">
                             <i class="fa-solid fa-times text-xs"></i>
                         </button>
                     `;
                 } else {
-                    // 前台模式：简洁显示
+                    // 前台模式：简洁显示，保留徽章
                     div.innerHTML = `
-                        <i class="fa-solid fa-book text-indigo-500"></i>
+                        <i class="fa-solid fa-book text-indigo-500 shrink-0"></i>
                         <span class="font-medium text-indigo-700 truncate">${this.escapeHtml(displayTitle)}</span>
+                        ${badgeHtml ? `<div class="ml-auto pl-2">${badgeHtml}</div>` : ''}
                     `;
                 }
                 container.appendChild(div);
@@ -4746,12 +4769,176 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
     addHomeEntryRef() {
         this.showEntrySelectDialog((entry) => {
             if (!entry) return;
-            const visibleVersion = this.getVisibleVersion(entry);
-            const title = visibleVersion ? visibleVersion.title : entry.code;
-            if (!this.data.homeContent) this.data.homeContent = [];
-            this.data.homeContent.push({ type: 'entry-ref', entryId: entry.id, title: title });
-            this.renderHomeCustomContent();
+            
+            // 【同步】如果存在多个版本，显示版本选择弹窗（GitHub精简版，无时间段）
+            if (entry.versions && entry.versions.length > 1) {
+                this.showVersionSelectDialogForHome(entry, (version, badgeInfo) => {
+                    if (!version) return; // 用户取消
+                    
+                    this.addHomeEntryRefInternal(entry.id, version.vid, version.title, badgeInfo);
+                });
+            } else {
+                // 单版本词条，直接添加
+                const version = entry.versions[0];
+                this.addHomeEntryRefInternal(entry.id, version?.vid, version?.title || entry.code, null);
+            }
         });
+    },
+    // 【新增】首页引用内部添加方法，支持版本ID和徽章样式
+    addHomeEntryRefInternal(entryId, versionId, title, badgeInfo) {
+        if (!this.data.homeContent) this.data.homeContent = [];
+        this.data.homeContent.push({ 
+            type: 'entry-ref', 
+            entryId: entryId, 
+            versionId: versionId,  // 【关键】存储版本ID实现定向引用
+            title: title,
+            // 支持自定义徽章（蓝底白字、黄底白字、灰底白字）
+            badgeText: badgeInfo?.text || '',
+            badgeClass: badgeInfo?.class || '' // 如 'bg-yellow-500 text-white', 'bg-blue-500 text-white', 'bg-gray-500 text-white'
+        });
+        this.renderHomeCustomContent();
+        this.showToast('已添加引用', 'success');
+    },
+
+    // 【新增】GitHub精简版版本选择弹窗（无时间段显示，支持徽章选择）
+    showVersionSelectDialogForHome(entry, callback) {
+        const overlay = document.createElement('div');
+        overlay.className = 'fixed inset-0 bg-black/50 z-[99999] flex items-center justify-center p-4 fade-in';
+        overlay.innerHTML = `
+            <div class="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col max-h-[80vh]">
+                <div class="p-4 border-b bg-indigo-50 rounded-t-xl flex justify-between items-center">
+                    <div>
+                        <h3 class="font-bold text-lg text-indigo-800">选择要引用的版本</h3>
+                        <p class="text-xs text-gray-600 mt-1">${entry.code} · ${entry.versions.length}个版本</p>
+                    </div>
+                    <button id="close-version-modal" class="text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-indigo-100 transition">
+                        <i class="fa-solid fa-times"></i>
+                    </button>
+                </div>
+                <div class="p-4 overflow-y-auto">
+                    <div id="version-list-container" class="space-y-2">
+                    </div>
+                    
+                    <!-- 徽章样式选择 -->
+                    <div class="mt-4 pt-4 border-t border-gray-200">
+                        <p class="text-xs text-gray-500 mb-2">选择右侧标签样式（可选）：</p>
+                        <div class="flex gap-2">
+                            <button onclick="app._selectBadgeStyle(null)" class="badge-select-btn flex-1 py-2 text-xs rounded border border-gray-200 hover:bg-gray-50 transition" data-style="">无标签</button>
+                            <button onclick="app._selectBadgeStyle('bg-yellow-500 text-white')" class="badge-select-btn flex-1 py-2 text-xs rounded border border-yellow-200 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 transition" data-style="bg-yellow-500 text-white">黄底白字</button>
+                            <button onclick="app._selectBadgeStyle('bg-blue-500 text-white')" class="badge-select-btn flex-1 py-2 text-xs rounded border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100 transition" data-style="bg-blue-500 text-white">蓝底白字</button>
+                            <button onclick="app._selectBadgeStyle('bg-gray-500 text-white')" class="badge-select-btn flex-1 py-2 text-xs rounded border border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100 transition" data-style="bg-gray-500 text-white">灰底白字</button>
+                        </div>
+                        <input type="text" id="badge-custom-text" placeholder="输入自定义文字（如'主角'、'重要'）" class="w-full mt-2 p-2 border border-gray-200 rounded text-xs">
+                    </div>
+                </div>
+                <div class="p-4 border-t bg-gray-50 rounded-b-xl flex justify-between items-center">
+                    <span class="text-xs text-gray-500">选择后将引用该版本的大标题</span>
+                    <div class="flex gap-2">
+                        <button id="btn-confirm-select" class="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-medium">
+                            确认添加
+                        </button>
+                        <button id="btn-cancel-select" class="px-4 py-2 text-gray-600 hover:bg-gray-200 rounded-lg transition text-sm">
+                            取消
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(overlay);
+        
+        let selectedVersion = null;
+        let selectedBadgeStyle = null;
+        
+        // 临时方法供按钮调用
+        this._selectBadgeStyle = (style) => {
+            selectedBadgeStyle = style;
+            // 视觉反馈
+            overlay.querySelectorAll('.badge-select-btn').forEach(btn => {
+                if (btn.dataset.style === style) {
+                    btn.classList.add('ring-2', 'ring-indigo-500', 'bg-opacity-100');
+                    if(style) btn.classList.add('text-white');
+                } else {
+                    btn.classList.remove('ring-2', 'ring-indigo-500', 'bg-opacity-100', 'text-white');
+                }
+            });
+        };
+        
+        const closeModal = (confirmed = false) => {
+            if (confirmed && selectedVersion) {
+                const badgeText = document.getElementById('badge-custom-text')?.value?.trim() || '';
+                const badgeInfo = selectedBadgeStyle ? {
+                    text: badgeText,
+                    class: selectedBadgeStyle
+                } : null;
+                callback(selectedVersion, badgeInfo);
+            } else {
+                callback(null);
+            }
+            delete this._selectBadgeStyle;
+            overlay.remove();
+        };
+        
+        overlay.querySelector('#close-version-modal').onclick = () => closeModal(false);
+        overlay.querySelector('#btn-cancel-select').onclick = () => closeModal(false);
+        overlay.querySelector('#btn-confirm-select').onclick = () => {
+            if (!selectedVersion) {
+                this.showToast('请先选择一个版本', 'warning');
+                return;
+            }
+            closeModal(true);
+        };
+        overlay.onclick = (e) => { if(e.target === overlay) closeModal(false); };
+        
+        // 渲染版本列表（GitHub精简版：只显示名称，无时间段）
+        const container = overlay.querySelector('#version-list-container');
+        entry.versions.forEach((version, idx) => {
+            const item = document.createElement('div');
+            item.className = 'p-3 border border-gray-200 rounded-lg hover:border-indigo-400 hover:bg-indigo-50 cursor-pointer transition flex items-center justify-between';
+            item.dataset.vid = version.vid;
+            
+            const levelBadge = version.level <= 2 ? 
+                `<span class="text-[10px] px-2 py-0.5 rounded ${version.level === 1 ? 'bg-yellow-100 text-yellow-700' : 'bg-blue-100 text-blue-700'}">${version.level === 1 ? '★ 主角' : '重要'}</span>` : '';
+            
+            item.innerHTML = `
+                <div>
+                    <div class="font-bold text-gray-800">${version.title}</div>
+                    <div class="text-xs text-gray-400 mt-0.5">版本 ${idx + 1}</div>
+                </div>
+                <div class="flex items-center gap-2">
+                    ${levelBadge}
+                    <i class="fa-solid fa-chevron-right text-gray-300"></i>
+                </div>
+            `;
+            
+            item.onclick = () => {
+                selectedVersion = version;
+                // 视觉反馈：选中高亮
+                container.querySelectorAll('div[data-vid]').forEach(div => {
+                    div.classList.remove('border-indigo-500', 'bg-indigo-50');
+                });
+                item.classList.add('border-indigo-500', 'bg-indigo-50');
+                
+                // 自动建议标签（根据重要程度）
+                const badgeInput = document.getElementById('badge-custom-text');
+                if (version.level === 1 && !selectedBadgeStyle) {
+                    this._selectBadgeStyle('bg-yellow-500 text-white');
+                    if(badgeInput) badgeInput.value = '主角';
+                } else if (version.level === 2 && !selectedBadgeStyle) {
+                    this._selectBadgeStyle('bg-blue-500 text-white');
+                    if(badgeInput) badgeInput.value = '重要';
+                }
+            };
+            
+            container.appendChild(item);
+        });
+    },
+
+    // 【新增】定向跳转到指定版本（首页引用使用）
+    openEntryWithVersion(entryId, versionId) {
+        this.data.editingId = entryId;
+        this.data.viewingVersionId = versionId;
+        this.router('detail');
     },
 
     showEntrySelectDialog(callback) {
