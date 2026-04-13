@@ -3741,16 +3741,33 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
         progress.close();
         console.error('[Import] 失败:', error);
         
-        // 保存进度逻辑
-        if (confirm(`导入失败: ${error.message}\n\n是否保存进度以便稍后继续？`)) {
+        // 【关键修复】智能合并模式下也能正确保存进度
+        // 计算当前应该所在的批次（估算）
+        let currentBatch = 0;
+        const totalEntries = (importedData.entries || importedData.data?.entries || []).length;
+        const ENTRIES_PER_FILE = 20;
+        const totalBatches = Math.ceil(totalEntries / ENTRIES_PER_FILE) + 1;
+        
+        // 如果错误发生在分片保存阶段，尝试从错误信息中解析批次
+        // 或者根据 entries 数量估算：假设已经成功保存了 80% 的 entries
+        if (this.data.entries && this.data.entries.length > 0) {
+            const savedCount = this.data.entries.length - totalEntries; // 已存在的条目数
+            if (savedCount > 0) {
+                currentBatch = Math.floor(savedCount / ENTRIES_PER_FILE);
+            }
+        }
+        
+        // 询问是否保存进度
+        if (confirm(`导入失败: ${error.message}\n\n是否保存进度以便稍后继续？\n（当前约在第 ${currentBatch}/${totalBatches} 批次）`)) {
             localStorage.setItem('wiki_import_progress', JSON.stringify({
                 filename: zipFile.name,
-                batchIndex: 0,
-                totalBatches: 1,
-                mode: mode,
+                batchIndex: currentBatch,
+                totalBatches: totalBatches,
+                mode: mode, // 【关键】确保保存模式
+                dataPath: this.githubStorage?.config?.dataPath || 'wiki-data',
                 timestamp: Date.now()
             }));
-            this.showToast('进度已保存', 'info', 5000);
+            this.showToast('进度已保存，请刷新页面后选择相同文件继续', 'info', 5000);
         } else {
             localStorage.removeItem('wiki_import_progress');
         }
@@ -3848,34 +3865,43 @@ fixData: async function() {
     };
 },
 // 【新增】检查并恢复导入进度（页面加载时调用）
+// 【替换】checkImportResume 方法（确保恢复时能正确传递 mode）
 checkImportResume: async function() {
     const saved = localStorage.getItem('wiki_import_progress');
     if (!saved) return;
     
     try {
         const progress = JSON.parse(saved);
+        
         // 检查是否超过 24 小时
         if (Date.now() - progress.timestamp > 24 * 60 * 60 * 1000) {
             localStorage.removeItem('wiki_import_progress');
             return;
         }
         
-        // 提示用户是否继续
-        if (confirm(`检测到未完成的导入: ${progress.filename}\n进度: ${progress.batchIndex}/${progress.totalBatches} 批次\n\n是否继续导入？`)) {
+        // 【关键修复】确保有 mode 字段，默认为 merge-update（智能合并）
+        const savedMode = progress.mode || 'merge-update';
+        const batchInfo = progress.batchIndex > 0 ? `（从第 ${progress.batchIndex} 批次继续）` : '';
+        
+        // 提示用户
+        if (confirm(`检测到未完成的导入: ${progress.filename}\n模式: ${savedMode === 'replace' ? '完全覆盖' : '智能合并'}\n进度: ${progress.batchIndex || 0}/${progress.totalBatches || '?'} 批次${batchInfo}\n\n是否继续导入？\n\n点击"确定"将要求您重新选择同一文件`)) {
             // 重新选择文件继续
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = '.zip';
             input.onchange = (e) => {
                 if (e.target.files[0]) {
-                    this.importZipFile(e.target.files[0], progress.mode, progress.batchIndex);
+                    // 【关键】传递恢复参数：mode 和 resumeFromShard
+                    this.importZipFile(e.target.files[0], savedMode, progress.batchIndex || 0);
                 }
             };
             input.click();
         } else {
             localStorage.removeItem('wiki_import_progress');
+            this.showToast('已清除导入进度', 'info');
         }
     } catch (e) {
+        console.error('[Resume] 恢复失败:', e);
         localStorage.removeItem('wiki_import_progress');
     }
 },
@@ -5490,7 +5516,7 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
             await this.saveDataSharded(progressCallback);
         }
     },
-    // 【替换】saveDataSharded 方法 - 实现分片保存与冲突退避
+    // 【完整替换】saveDataSharded 方法 - 针对 data.json 强化保存
     async saveDataSharded(progressCallback = null) {
         try {
             console.log('[Wiki] 开始分片保存数据...');
@@ -5502,28 +5528,32 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
             const totalEntries = this.data.entries.length;
             console.log(`[Wiki] 需要保存 ${totalEntries} 个词条`);
             
-            // 分片配置：每 20 个词条一个文件（降低单文件大小，减少409概率）
+            // 分片配置：每 20 个词条一个文件
             const ENTRIES_PER_FILE = 20;
-            const totalFiles = Math.ceil(totalEntries / ENTRIES_PER_FILE) + 1; // +1 用于基础数据
+            const totalShards = Math.ceil(totalEntries / ENTRIES_PER_FILE);
             
             if (progressCallback) progressCallback(5, '正在准备数据...');
             
-            // 1. 构建基础数据（settings, chapters, camps, synopsis, announcements, homeContent）
+            // 1. 构建基础数据
             const baseData = {
                 version: '2.7.0-sharded',
                 lastUpdate: Date.now(),
                 totalEntries: totalEntries,
-                entryFiles: [], // 记录分片文件列表
+                entryFiles: [],
                 settings: this.data.settings,
                 chapters: this.data.chapters || [],
                 camps: this.data.camps || ['主角团', '反派', '中立'],
                 synopsis: this.data.synopsis || [],
                 announcements: this.data.announcements || [],
                 homeContent: this.data.homeContent || [],
-                customFields: this.data.customFields || {}
+                customFields: this.data.customFields || {},
+                // 时间节点数据
+                timelineNodes: this.data.timelineNodes || [],
+                newReaderNodeId: this.data.newReaderNodeId,
+                latestNodeId: this.data.latestNodeId
             };
             
-            // 2. 清理并准备分片数据（移除内嵌base64图片，避免data.json膨胀）
+            // 2. 清理并准备分片数据
             const cleanedEntries = JSON.parse(JSON.stringify(this.data.entries));
             cleanedEntries.forEach(entry => {
                 if (entry.versions) {
@@ -5545,7 +5575,8 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
             const entryShards = [];
             for (let i = 0; i < totalEntries; i += ENTRIES_PER_FILE) {
                 const shard = cleanedEntries.slice(i, i + ENTRIES_PER_FILE);
-                const fileName = `entries-${Math.floor(i / ENTRIES_PER_FILE)}.json`;
+                const shardIndex = Math.floor(i / ENTRIES_PER_FILE);
+                const fileName = `entries-${shardIndex}.json`;
                 entryShards.push({ 
                     name: fileName, 
                     data: shard, 
@@ -5556,28 +5587,40 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
                 baseData.entryFiles.push(fileName);
             }
             
-            console.log(`[Wiki] 分为 ${entryShards.length} 个分片，基础数据 ${JSON.stringify(baseData).length} 字节`);
+            console.log(`[Wiki] 分为 ${entryShards.length} 个分片`);
             
-            if (progressCallback) progressCallback(10, '保存基础数据...');
+            // 4. 【关键修复】先保存基础数据（使用15次重试和初始延迟）
+            if (progressCallback) progressCallback(10, '保存基础索引...');
             
-            // 4. 先保存基础数据（这样即使分片失败，结构还在）
             let baseSaved = false;
             for (let retry = 0; retry < 3; retry++) {
                 try {
-                    await this.githubStorage.putFile('data.json', JSON.stringify(baseData, null, 2), 'Update Wiki base data');
+                    // 首次尝试前等待，避免与前次操作冲突
+                    if (retry === 0) await new Promise(r => setTimeout(r, 1500));
+                    
+                    // 【关键】使用15次重试（而非默认10次）
+                    await this.githubStorage.putFile(
+                        'data.json', 
+                        JSON.stringify(baseData, null, 2), 
+                        'Update Wiki base data',
+                        false,
+                        15 // 强制15次重试
+                    );
                     baseSaved = true;
                     console.log('[Wiki] ✅ 基础数据已保存');
                     break;
                 } catch (e) {
                     console.warn(`[Wiki] 基础数据保存尝试 ${retry + 1} 失败:`, e.message);
-                    if (retry === 2) throw new Error('基础数据保存失败: ' + e.message);
-                    await new Promise(r => setTimeout(r, 1000 * (retry + 1)));
+                    if (retry === 2) {
+                        throw new Error('基础数据保存失败: ' + e.message);
+                    }
+                    await new Promise(r => setTimeout(r, 3000 * (retry + 1))); // 递增延迟
                 }
             }
             
             if (progressCallback) progressCallback(20, `开始保存 ${entryShards.length} 个分片...`);
             
-            // 5. 逐个保存分片（带批次间延迟和独立重试）
+            // 5. 逐个保存分片（带批次间延迟）
             let savedShards = 0;
             let failedShards = [];
             
@@ -5585,17 +5628,16 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
                 const shard = entryShards[i];
                 let shardSaved = false;
                 
-                // 【关键】批次间添加基础延迟，避免GitHub API限流和409冲突
+                // 【关键】批次间添加基础延迟，避免GitHub API限流
                 if (i > 0) {
-                    const batchDelay = 800; // 每个批次间隔800ms
-                    console.log(`[Wiki] 批次间隔等待 ${batchDelay}ms...`);
+                    const batchDelay = 800; // 800ms间隔
                     await new Promise(r => setTimeout(r, batchDelay));
                 }
                 
-                // 每个分片独立重试3次，使用指数退避
+                // 每个分片独立重试3次
                 for (let retry = 0; retry < 3; retry++) {
                     try {
-                        console.log(`[Wiki] 保存分片 ${shard.name} (${shard.start}-${shard.end}, ${shard.size} 字节)...`);
+                        console.log(`[Wiki] 保存分片 ${shard.name} (${shard.start}-${shard.end})...`);
                         
                         await this.githubStorage.putFile(
                             shard.name, 
@@ -5605,17 +5647,13 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
                         
                         savedShards++;
                         shardSaved = true;
-                        console.log(`[Wiki] ✅ 分片 ${shard.name} 已保存`);
                         break;
                         
                     } catch (e) {
                         console.warn(`[Wiki] ⚠️ 分片 ${shard.name} 尝试 ${retry + 1}/3 失败:`, e.message);
                         
                         if (retry < 2) {
-                            // 指数退避：3秒, 6秒, 12秒, 24秒, 48秒...（更保守）
-                            const waitTime = Math.min(3000 * Math.pow(2, attempt - 1), 60000);
-                            console.log(`[Wiki] 等待 ${waitTime}ms 后重试...`);
-                            await new Promise(r => setTimeout(r, waitTime));
+                            await new Promise(r => setTimeout(r, 2000 * (retry + 1)));
                         }
                     }
                 }
@@ -5630,45 +5668,39 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
                 if (progressCallback) progressCallback(progress, `正在保存词条 ${shard.end}/${totalEntries}...`);
             }
             
-            // 6. 如果有失败的分片，更新 data.json 标记
+            // 6. 【关键修复】最终索引保存前添加延迟，确保GitHub缓存已更新
+            if (progressCallback) progressCallback(95, '正在最终确认...');
+            
+            await new Promise(r => setTimeout(r, 3000)); // 3秒延迟
+            
+            // 更新失败标记（如果有）
             if (failedShards.length > 0) {
                 baseData.failedShards = failedShards;
                 baseData.lastUpdate = Date.now();
-                
-                // 尝试更新标记（不重试，避免无限循环）
-                try {
-                    await this.githubStorage.putFile('data.json', JSON.stringify(baseData, null, 2), 'Update base data (mark failed shards)');
-                } catch (e) {
-                    console.warn('[Wiki] 标记失败分片时出错:', e.message);
-                }
-                
-                console.warn(`[Wiki] ⚠️ ${failedShards.length} 个分片保存失败已标记:`, failedShards);
             }
             
-            if (progressCallback) progressCallback(95, '正在验证...');
-            
-            // 7. 简单验证（重新读取 data.json）
-            let verifySuccess = false;
-            for (let vRetry = 0; vRetry < 3; vRetry++) {
+            // 使用15次重试保存最终索引
+            let finalSaved = false;
+            for (let retry = 0; retry < 3; retry++) {
                 try {
-                    // 等待GitHub缓存刷新
-                    if (vRetry > 0) await new Promise(r => setTimeout(r, 1000));
-                    
-                    const verify = await this.githubStorage.getFile('data.json');
-                    if (verify && verify.content) {
-                        const parsed = JSON.parse(verify.content);
-                        if (parsed.version && parsed.lastUpdate) {
-                            verifySuccess = true;
-                            break;
-                        }
+                    await this.githubStorage.putFile(
+                        'data.json', 
+                        JSON.stringify(baseData, null, 2), 
+                        'Import complete',
+                        false,
+                        15
+                    );
+                    finalSaved = true;
+                    break;
+                } catch (e) {
+                    console.warn(`[Wiki] 最终索引保存尝试 ${retry + 1} 失败:`, e.message);
+                    if (retry === 2) {
+                        console.warn('[Wiki] ⚠️ 最终索引保存失败，但分片数据已保存');
+                        // 不抛出错误，因为这是非致命的，数据已经保存
+                        break;
                     }
-                } catch (e) {
-                    console.warn(`[Wiki] 验证尝试 ${vRetry + 1} 失败:`, e.message);
+                    await new Promise(r => setTimeout(r, 5000 * (retry + 1))); // 更长延迟
                 }
-            }
-            
-            if (!verifySuccess) {
-                console.warn('[Wiki] ⚠️ 验证步骤未通过，但数据可能已保存');
             }
             
             if (progressCallback) progressCallback(100, '保存完成！');

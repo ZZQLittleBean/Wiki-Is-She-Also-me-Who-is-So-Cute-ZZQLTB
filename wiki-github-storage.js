@@ -137,8 +137,8 @@
             }
         },
 
-        // 替换 putFile 方法（正确编码 UTF-8）
-        async putFile(path, content, message = 'Update via Wiki', isBinary = false, retryCount = 5) {
+        // 替换 putFile 方法（wiki-github-storage.js 中）
+        async putFile(path, content, message = 'Update via Wiki', isBinary = false, retryCount = 10) {
             let attempt = 0;
             let lastSha = null;
             
@@ -187,14 +187,14 @@
                         }
                     );
 
-                    // 【关键修复】409冲突处理：强制指数退避
+                    // 【关键修复】409冲突处理：更长的指数退避 + 随机抖动
                     if (response.status === 409 || response.status === 422) {
                         const err = await response.json().catch(() => ({}));
                         console.warn(`[GitHub] ${response.status}: ${err.message || 'Conflict'}，等待后重试...`);
                         
-                        // 指数退避：1秒, 2秒, 4秒, 8秒, 16秒
-                        const waitTime = Math.min(1000 * Math.pow(2, attempt - 1), 20000);
-                        console.log(`[GitHub] 等待 ${waitTime}ms 后重试 (${attempt}/${retryCount})...`);
+                        // 【关键】指数退避：3秒, 6秒, 12秒, 24秒, 48秒... + 0-2秒随机抖动，最大60秒
+                        const waitTime = Math.min(3000 * Math.pow(2, attempt - 1) + Math.random() * 2000, 60000);
+                        console.log(`[GitHub] 等待 ${waitTime.toFixed(0)}ms 后重试 (${attempt}/${retryCount})...`);
                         await new Promise(r => setTimeout(r, waitTime));
                         
                         // 强制重新获取SHA（GitHub缓存延迟）
@@ -222,14 +222,14 @@
                 } catch (error) {
                     console.error(`[GitHub] 尝试 ${attempt} 失败:`, error.message);
                     
-                    // 如果是409，继续重试；如果是401，直接抛出（权限不足）
+                    // 如果是401，直接抛出（权限不足）
                     if (error.message && error.message.includes('401')) {
                         throw new Error('未授权：请检查Token是否有效或是否已过期');
                     }
                     
                     if (attempt >= retryCount) throw error;
                     
-                    // 其他错误也使用退避
+                    // 其他错误也使用退避，但时间较短
                     await new Promise(r => setTimeout(r, 1000 * attempt));
                 }
             }
