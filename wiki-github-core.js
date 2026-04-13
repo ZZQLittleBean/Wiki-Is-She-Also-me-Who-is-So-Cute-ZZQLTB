@@ -1316,7 +1316,7 @@ Object.assign(window.app, {
         return result;
     },
 
-    // 【完整替换】renderDetail 函数 - 修复换行显示和角色引用
+    // 【完整替换】renderDetail 函数 - 支持多版本链接索引与完整 Markdown 样式
     renderDetail(container) {
         const entry = this.data.entries.find(e => e.id === this.data.editingId);
         if (!entry) {
@@ -1324,7 +1324,11 @@ Object.assign(window.app, {
             return;
         }
         
-        const version = this.getVisibleVersion(entry) || entry.versions?.[entry.versions.length - 1];
+        // 优先使用 viewingVersionId（链接跳转指定），其次获取可见版本
+        let version = entry.versions.find(v => v.vid === this.data.viewingVersionId) || 
+                    this.getVisibleVersion(entry) || 
+                    entry.versions[entry.versions.length - 1];
+        
         if (!version) {
             container.innerHTML = '<div class="p-4 text-red-600">该条目没有内容</div>';
             return;
@@ -1344,7 +1348,7 @@ Object.assign(window.app, {
         
         const contentEl = clone.getElementById('detail-content');
         
-        // 构建 GitHub Raw URL 基础路径
+        // 构建 GitHub Raw URL 基础路径（用于图片解析）
         let baseUrl = '';
         if (this.githubStorage?.config?.owner) {
             const { owner, repo, branch, dataPath } = this.githubStorage.config;
@@ -1352,7 +1356,7 @@ Object.assign(window.app, {
             baseUrl = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${safeDataPath}/images/`;
         }
         
-        // 防御性获取并实时解析图片 URL
+        // 解析图片 URL（防御性获取）
         let imgUrl = '';
         const rawImg = version.images?.card || version.images?.avatar || version.image || '';
         
@@ -1363,6 +1367,7 @@ Object.assign(window.app, {
                 const match = rawImg.match(/\{\{IMG:\s*([^}]+)\s*\}\}/);
                 if (match && match[1]) {
                     let filename = match[1].trim();
+                    // 自动修复截断的扩展名
                     if (filename.endsWith('.jp') && !filename.endsWith('.jpg')) filename += 'g';
                     if (filename.endsWith('.jpe')) filename += 'g';
                     if (filename.endsWith('.pn')) filename += 'g';
@@ -1375,10 +1380,11 @@ Object.assign(window.app, {
             imgUrl = imgUrl + 'g';
         }
         
-        // 【新增】重要程度标签样式
+        // 重要程度标签样式
         const level = version.level || 5;
         const levelClass = level <= 2 ? 'bg-amber-100 text-amber-700' : (level === 3 ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600');
-        // 【关键修复】处理题记换行和HTML转义（与正文保持相同逻辑）
+        
+        // 处理题记换行和HTML转义（与正文保持相同逻辑）
         let processedSubtitle = '';
         if (version.subtitle) {
             processedSubtitle = version.subtitle
@@ -1389,18 +1395,17 @@ Object.assign(window.app, {
                 .replace(/\n/g, '<br>');         // 3. 关键：将换行符转为<br>
         }
 
-        // 渲染内容头部（【修改】添加等级标签）
+        // 渲染内容头部（添加等级标签）
         let contentHtml = `
             <div class="flex flex-col md:flex-row gap-6 mb-6">
                 <div class="flex-1">
                     <div class="flex items-center gap-3 mb-3 flex-wrap">
                         <h1 class="text-3xl font-bold text-gray-900">${version.title || '未命名'}</h1>
-                        <!-- 【新增】重要程度标签 -->
                         <span class="px-2.5 py-1 rounded-full text-xs font-bold ${levelClass} border border-current opacity-80" title="重要程度等级">
                             Lv.${level}
                         </span>
                     </div>
-                    ${version.subtitle ? `<p class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4" style="white-space: pre-wrap;">${version.subtitle.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</p>` : ''}
+                    ${processedSubtitle ? `<p class="text-lg italic text-gray-600 border-l-4 border-indigo-300 pl-4" style="white-space: pre-wrap;">${processedSubtitle}</p>` : ''}
                 </div>
         `;
         
@@ -1420,7 +1425,7 @@ Object.assign(window.app, {
         
         contentHtml += '</div>';
         
-        // 【关键修改】正文块渲染（支持换行和HTML格式）
+        // 【关键更新】正文块渲染（支持多版本链接、Markdown样式、粗斜体）
         contentHtml += '<div class="prose prose-sm max-w-none">';
         if (version.blocks && version.blocks.length > 0) {
             version.blocks.forEach(block => {
@@ -1431,27 +1436,116 @@ Object.assign(window.app, {
                 } else {
                     let text = block.text || '';
                     
-                    // 【新增】转义HTML防止XSS，但保留允许的格式标签
-                    text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                    // 恢复允许的HTML标签（b, i, u, br）
-                    text = text.replace(/&lt;(b|i|u|br)\s*\/?&gt;/g, '<$1>');
-                    text = text.replace(/&lt;\/(b|i|u)&gt;/g, '</$1>');
-                    // 【关键】处理换行符
-                    text = text.replace(/\n/g, '<br>');
-                    // 处理内部链接 [[...]]
-                    text = text.replace(/\[\[(.*?)\]\]/g, '<a href="#" onclick="app.searchAndOpen(\'$1\'); return false;" class="text-indigo-600 hover:underline">$1</a>');
-                    // 1. 角色引用：@姓名[编号] -> 蓝色标签（与本地版一致）
+                    // 【核心逻辑】多版本词条链接解析（同步本地版）
+                    
+                    // 辅助函数：通过ID或Code查找条目
+                    const findEntry = (idOrCode) => {
+                        if (!idOrCode) return null;
+                        const cleanId = String(idOrCode).trim();
+                        let entry = this.data.entries.find(e => String(e.id).trim() === cleanId);
+                        if (!entry) {
+                            entry = this.data.entries.find(e => e.code === cleanId);
+                        }
+                        return entry;
+                    };
+                    
+                    // 1. 新格式：[[entryId|versionId:displayText]] - 精确指向特定版本
+                    text = text.replace(/\[\[([^\]|]+)\|([^:\]]+):([^\]]+)\]\]/g, (match, entryId, versionId, displayText) => {
+                        const cleanEntryId = entryId.trim();
+                        const cleanVersionId = versionId.trim();
+                        const targetEntry = findEntry(cleanEntryId);
+                        
+                        if (targetEntry && targetEntry.versions) {
+                            // 验证版本存在性，不存在则降级到首个版本
+                            const targetVersion = targetEntry.versions.find(v => v.vid === cleanVersionId);
+                            const actualVid = targetVersion ? targetVersion.vid : (targetEntry.versions[0]?.vid || '');
+                            const safeId = String(targetEntry.id).replace(/'/g, "\\'");
+                            const safeVid = String(actualVid).replace(/'/g, "\\'");
+                            return `<a href="#" class="text-indigo-600 hover:underline font-medium" onclick="app.switchToVersion('${safeId}', '${safeVid}'); return false;">${displayText.trim()}</a>`;
+                        }
+                        return `<span class="text-red-400" title="词条未找到">[[${displayText.trim()}]]</span>`;
+                    });
+                    
+                    // 2. 旧格式：[[entryIdOrCode:displayText]] - 指向首个版本（确保链接稳定）
+                    text = text.replace(/\[\[([^\]|]+):([^\]]+)\]\]/g, (match, entryIdOrCode, displayText) => {
+                        const cleanId = entryIdOrCode.trim();
+                        const targetEntry = findEntry(cleanId);
+                        
+                        if (targetEntry && targetEntry.versions && targetEntry.versions.length > 0) {
+                            // 【关键】指向首个版本（最旧），确保新增版本后链接不变
+                            const firstVersion = targetEntry.versions[0];
+                            const safeId = String(targetEntry.id).replace(/'/g, "\\'");
+                            const safeVid = String(firstVersion.vid).replace(/'/g, "\\'");
+                            return `<a href="#" class="text-indigo-600 hover:underline font-medium" onclick="app.switchToVersion('${safeId}', '${safeVid}'); return false;">${displayText.trim()}</a>`;
+                        }
+                        return `<span class="text-red-400" title="词条未找到">[[${displayText.trim()}]]</span>`;
+                    });
+                    
+                    // 3. 旧格式兼容：[[title]] - 通过标题查找
+                    text = text.replace(/\[\[(.*?)\]\]/g, (match, title) => {
+                        // 排除已处理的新格式（包含|或:）
+                        if (match.includes('|') || match.includes(':')) return match;
+                        
+                        const cleanTitle = title.trim();
+                        const targetEntry = this.data.entries.find(e => {
+                            const v = this.getVisibleVersion(e);
+                            return v && v.title === cleanTitle;
+                        });
+                        
+                        if (targetEntry && targetEntry.versions.length > 0) {
+                            const firstVersion = targetEntry.versions[0];
+                            const safeId = String(targetEntry.id).replace(/'/g, "\\'");
+                            const safeVid = String(firstVersion.vid).replace(/'/g, "\\'");
+                            return `<a href="#" class="text-indigo-600 hover:underline font-medium" onclick="app.switchToVersion('${safeId}', '${safeVid}'); return false;">${cleanTitle}</a>`;
+                        }
+                        return `<span class="text-gray-400">[[${cleanTitle}]]</span>`;
+                    });
+                    
+                    // 4. 角色引用：@姓名[编号] -> 蓝色标签（与本地版一致）
                     text = text.replace(/@([^\[]+)\[([^\]]+)\]/g, (match, name, code) => {
-                        const cleanCode = code.replace(/\\/g, ''); // 清除可能的转义
+                        const cleanCode = code.replace(/\\/g, '');
                         return `<span class="synopsis-entry-ref cursor-pointer text-indigo-600 font-medium border-b-2 border-indigo-300 hover:bg-indigo-50 px-1 rounded transition" data-entry-code="${cleanCode}" onmouseenter="app.handleSynopsisRefHover(this)" onmouseleave="app.handleSynopsisRefLeave(this)" onclick="app.openEntryByCode('${cleanCode}')"><i class="fa-solid fa-user text-xs mr-1"></i>${name}</span>`;
                     });
 
-                    // 2. 剧情引用：{{synopsis:id:title}} -> 蓝色标签（与本地版一致）
+                    // 5. 剧情引用：{{synopsis:id:title}} -> 蓝色标签（与本地版一致）
                     text = text.replace(/\{\{synopsis:([^:]+):([^}]+)\}\}/g, (match, chapterId, title) => {
                         const chapter = this.data.synopsis.find(s => s.id === chapterId);
                         if (!chapter) return match;
                         return `<span class="synopsis-entry-ref cursor-pointer text-indigo-600 font-medium border-b-2 border-indigo-300 hover:bg-indigo-50 px-1 rounded transition" data-chapter-id="${chapterId}" onmouseenter="app.handleSynopsisRefHover(this)" onmouseleave="app.handleSynopsisRefLeave(this)" onclick="app.handleSynopsisRefClick(this)"><i class="fa-solid fa-film text-xs mr-1"></i>${title}</span>`;
                     });
+
+                    // 【样式解析】Markdown 与 HTML 样式处理（与本地版兼容）
+                    
+                    // 注意：以下顺序很重要，先处理复杂组合，再处理简单标记
+                    
+                    // 6. 删除线：~~text~~ -> <del>text</del>
+                    text = text.replace(/~~(.+?)~~/g, '<del>$1</del>');
+                    
+                    // 7. 【新增】粗斜体：***text*** 或 **_text_** 或 *__text__* -> <b><i>text</i></b>
+                    text = text.replace(/\*\*\*(.+?)\*\*\*/g, '<b><i>$1</i></b>');
+                    text = text.replace(/\*\*_(.+?)_\*\*/g, '<b><i>$1</i></b>');
+                    text = text.replace(/\*__(.+?)__\*/g, '<i><b>$1</b></i>');
+                    text = text.replace(/___(.+?)___/g, '<b><i>$1</i></b>');
+                    
+                    // 8. 粗体：**text** -> <b>text</b>
+                    text = text.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+                    
+                    // 9. 斜体：*text* -> <i>text</i>
+                    text = text.replace(/\*(.+?)\*/g, '<i>$1</i>');
+                    
+                    // 10. 下划线：__text__ -> <u>text</u>（遵循本地版约定：双下划线为下划线）
+                    text = text.replace(/__(.+?)__/g, '<u>$1</u>');
+                    
+                    // 11. HTML 标签转义（防止 XSS）- 将剩余的 < > 转为实体
+                    text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    
+                    // 12. 恢复允许的 HTML 标签（b, i, u, br, del）- 将授权的实体转回标签
+                    text = text.replace(/&lt;(b|i|u|br|del)\s*\/?&gt;/g, '<$1>');
+                    text = text.replace(/&lt;\/(b|i|u|del)&gt;/g, '</$1>');
+                    
+                    // 13. 处理换行符（\n -> <br>）- 兼容本地版 Enter 换行
+                    text = text.replace(/\n/g, '<br>');
+                    
                     contentHtml += `<p class="text-gray-600 leading-relaxed mb-4 break-all">${text}</p>`;
                 }
             });
