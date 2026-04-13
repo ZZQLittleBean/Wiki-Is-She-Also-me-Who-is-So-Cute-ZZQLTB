@@ -1,6 +1,6 @@
 {
   "version": "2.7.0-sharded",
-  "lastUpdate": 1776087934768,
+  "lastUpdate": 1776089054586,
   "totalEntries": 78,
   "entryFiles": [],
   "settings": {
@@ -625,17 +625,13 @@
       "type": "entry-ref",
       "entryId": "char-xiaoli",
       "versionId": "v-1774543291292",
-      "title": "张可云",
-      "badgeText": "--当前状态--",
-      "badgeClass": "bg-yellow-500 text-white"
+      "title": "张可云"
     },
     {
       "type": "entry-ref",
       "entryId": "char-protagonist",
       "versionId": "v-default",
-      "title": "张可颂",
-      "badgeText": "",
-      "badgeClass": ""
+      "title": "张可颂"
     },
     {
       "type": "text",
