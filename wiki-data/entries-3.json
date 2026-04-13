@@ -1,8 +1,8 @@
 [
   {
-    "id": "char-1774546471127-jwd7n",
+    "id": "char-1774546471127-guldb",
     "type": "character",
-    "code": "C-043",
+    "code": "C-029",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -12,8 +12,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-ciyk4",
-        "title": "张伟骚",
+        "vid": "v-1774546471127-z13mr",
+        "title": "杨克妙",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -31,7 +31,7 @@
           },
           {
             "type": "p",
-            "text": "这是张伟骚的角色词条。"
+            "text": "这是杨克妙的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -41,9 +41,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-rs0hy",
+    "id": "char-1774546471127-fhkpf",
     "type": "character",
-    "code": "C-044",
+    "code": "C-030",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -53,8 +53,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-ado2j",
-        "title": "吴卷航",
+        "vid": "v-1774546471127-onbek",
+        "title": "马四季",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -72,7 +72,7 @@
           },
           {
             "type": "p",
-            "text": "这是吴卷航的角色词条。"
+            "text": "这是马四季的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -82,9 +82,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-cbktx",
+    "id": "char-1774546471127-6hef5",
     "type": "character",
-    "code": "C-045",
+    "code": "C-031",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -94,8 +94,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-opos9",
-        "title": "吴亚",
+        "vid": "v-1774546471127-qp5qe",
+        "title": "代氪",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -113,7 +113,7 @@
           },
           {
             "type": "p",
-            "text": "这是吴亚的角色词条。"
+            "text": "这是代氪的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -123,9 +123,9 @@
     ]
   },
   {
-    "id": "char-1774546471127-y3fj9",
+    "id": "char-1774546471127-snrlt",
     "type": "character",
-    "code": "C-046",
+    "code": "C-032",
     "camp": "",
     "pinned": false,
     "pinStartChapter": null,
@@ -135,8 +135,8 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-yvlw6",
-        "title": "胡上校",
+        "vid": "v-1774546471127-v5lz0",
+        "title": "刘璺薪",
         "subtitle": "",
         "level": 3,
         "image": null,
@@ -154,7 +154,7 @@
           },
           {
             "type": "p",
-            "text": "这是胡上校的角色词条。"
+            "text": "这是刘璺薪的角色词条。"
           }
         ],
         "relatedVersions": [],
@@ -164,143 +164,422 @@
     ]
   },
   {
-    "id": "char-1774026694075-8i2iofwqf",
+    "id": "char-1774546471127-2oqs0",
     "type": "character",
-    "code": "C-018",
-    "camp": "塞坦科技",
+    "code": "C-033",
+    "camp": "",
     "pinned": false,
-    "versions": [
-      {
-        "vid": "v-1774026694075-il4fgzpsm",
-        "title": "张可歆",
-        "subtitle": "自系统人格束缚中找回了自我的少女。\n似乎是“奇迹”从中作梗，她如今的模样与曾经的那个“出厂化”面孔截然不同，倒是与张可云有几分相似。\n......“你也该，有个属于自己的名字了吧？”",
-        "image": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_card.jpg",
-        "images": {
-          "avatar": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_avatar.jpg",
-          "card": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_card.jpg",
-          "cover": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774026694075-il4fgzpsm_cover.jpg"
-        },
-        "chapterFrom": "ch-1774186885948-fbqoj",
-        "chapterTo": null,
-        "blocks": [],
-        "relatedVersions": [
-          "v-1774459049483"
-        ],
-        "relatedCharacters": [
-          {
-            "charId": "char-xiaoli",
-            "relationName": "曾经的系统“主仆”"
-          }
-        ],
-        "createdAt": 1774026694075,
-        "level": 2
-      },
-      {
-        "vid": "v-1774459049483",
-        "title": "“终端酱”",
-        "subtitle": "张可云的“塞坦终端”中不知何时添加进来的“系统人格”，通俗点说可以算是一种语言模型。\n具有不可忽视的运算能力，对张可云貌似有很深的好感，但总觉得有一种被“底层”强行修正的错觉。\n......你说，这家伙好像也太像个真正的人了吧？",
-        "level": 3,
-        "image": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774459049483_card.jpg",
-        "images": {
-          "avatar": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774459049483_avatar.jpg",
-          "card": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774459049483_card.jpg",
-          "cover": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774026694075-8i2iofwqf_v-1774459049483_cover.jpg"
-        },
-        "chapterFrom": "ch-1774459223566",
-        "chapterTo": "ch-1774186885948-7gaqi",
-        "blocks": [],
-        "relatedVersions": [
-          "v-1774026694075-il4fgzpsm"
-        ],
-        "relatedCharacters": [],
-        "createdAt": 1774459049483
-      }
-    ],
     "pinStartChapter": null,
     "pinEndChapter": null,
     "pinnedVersions": {},
     "missingIntervalVersion": null,
-    "defaultPinnedVersion": "v-1774026694075-il4fgzpsm"
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-rchqd",
+        "title": "易谟戟",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是易谟戟的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
   },
   {
-    "id": "non-1774026872991",
+    "id": "char-1774546471127-g322r",
+    "type": "character",
+    "code": "C-034",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-3sgaj",
+        "title": "翊",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是翊的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-f70cb",
+    "type": "character",
+    "code": "C-035",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-4kjo6",
+        "title": "翎",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是翎的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-v4ch0",
+    "type": "character",
+    "code": "C-036",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-cgjwd",
+        "title": "曦芷",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是曦芷的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-pi7t0",
+    "type": "character",
+    "code": "C-037",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-i5tfo",
+        "title": "楚山本",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是楚山本的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-5thlx",
+    "type": "character",
+    "code": "C-038",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-g6b1g",
+        "title": "张破军",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是张破军的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-mflbk",
+    "type": "character",
+    "code": "C-039",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-fdozi",
+        "title": "冯珅",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是冯珅的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-k8txp",
+    "type": "character",
+    "code": "C-040",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-xxahu",
+        "title": "陈番淑",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是陈番淑的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-8d22x",
+    "type": "character",
+    "code": "C-041",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-lpnxf",
+        "title": "赵悦离谱",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是赵悦离谱的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "char-1774546471127-y8qpf",
+    "type": "character",
+    "code": "C-042",
+    "camp": "",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1774546471127-ww681",
+        "title": "张奇华",
+        "subtitle": "",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "角色简介"
+          },
+          {
+            "type": "p",
+            "text": "这是张奇华的角色词条。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "non-1775994468111",
     "type": "non-character",
-    "code": "N-004",
+    "code": "N-011",
     "camp": "",
     "settingType": "custom",
     "pinned": false,
-    "versions": [
-      {
-        "vid": "v-1774026872991",
-        "title": "325与相关概念",
-        "subtitle": "“什么是325？难道说......”",
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774026872991,
-        "level": 4
-      }
-    ],
-    "customSettingType": "325目录（？）",
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null
-  },
-  {
-    "id": "camp-1774176471569",
-    "type": "non-character",
-    "code": "N-005",
-    "level": 3,
-    "camp": "",
-    "settingType": "faction",
-    "pinned": false,
-    "isCampEntry": true,
-    "versions": [
-      {
-        "vid": "v-default",
-        "title": "ZZQ小豆同学的主角区间",
-        "subtitle": "ZZQ小豆同学的主角区间相关设定",
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "阵营简介"
-          },
-          {
-            "type": "p",
-            "text": "这是ZZQ小豆同学的主角区间的详细介绍。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774176471569
-      }
-    ]
-  },
-  {
-    "id": "char-1774456559847",
-    "type": "character",
-    "code": "C-021",
-    "camp": "塞坦科技",
-    "settingType": null,
-    "pinned": false,
     "pinStartChapter": null,
     "pinEndChapter": null,
     "pinnedVersions": {},
@@ -308,232 +587,125 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774456559847",
-        "title": "孙小孙",
-        "subtitle": "张可云的堂哥。塞坦科技技术部的成员，主要工作是测试公司近期较新的科研成果，在正式发布前把关，因此他们总能拿到比较尖端的产品。\n只不过，工作之外他貌似更喜欢摸鱼？\n你说......“摸鱼是为了更有力气工作”？\n得了吧你。",
+        "vid": "v-1775994468111",
+        "title": "“迷行法术”",
+        "subtitle": "张可颂为张可云准备的掩藏自己变化事实的法术，至少在身形和声音层面可以勉强伪装一下。\n但这个法术貌似有着不小的限制......",
         "level": 2,
-        "image": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456559847_card.jpg",
+        "image": null,
         "images": {
-          "avatar": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456559847_avatar.jpg",
-          "card": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456559847_card.jpg",
-          "cover": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456559847_cover.jpg"
+          "avatar": null,
+          "card": null,
+          "cover": null
         },
-        "chapterFrom": "ch-1774186885948-1q7ip",
-        "chapterTo": "ch-1774456712953",
-        "blocks": [],
-        "relatedVersions": [
-          "v-1774456771811"
-        ],
-        "relatedCharacters": [
+        "chapterFrom": "ch-1774186885948-aaljk",
+        "chapterTo": null,
+        "blocks": [
           {
-            "charId": "char-xiaoli",
-            "relationName": "堂兄妹"
+            "type": "h2",
+            "text": "概述"
           },
           {
-            "charId": "char-protagonist",
-            "relationName": "堂兄妹"
+            "type": "p",
+            "text": "虽然颂颂的法术经验确实比张可云丰富不少，但由于实际"
           }
         ],
-        "createdAt": 1774456559847
+        "relatedVersions": [
+          "v-1775994837598"
+        ],
+        "relatedCharacters": [],
+        "createdAt": 1775994468111
       },
       {
-        "vid": "v-1774456771811",
-        "title": "孙小孙",
-        "subtitle": "“世界融合”最首当其冲的“受害者”（存疑）。不论是自己的身体与认知，还是他人对她的记忆，均已经完全变成了No_002世界的孙小孙的模样。\n出于某些特殊的原因离开了塞坦科技。\n说起来，她现在是不是开始对曾经的好基友产生些许奇怪的好感了？\n“我会替你，替‘我们’......好好活下去的。”",
+        "vid": "v-1775994837598",
+        "title": "“迷行法术”",
+        "subtitle": "张可颂为张可云准备的掩藏自己变化事实的法术，至少在身形和声音层面可以勉强伪装一下。\n但这个法术貌似有着不小的限制......而且随着“世界融合”的加剧，“迷行法术”驱动的某种原动力也正慢慢枯竭。",
         "level": 2,
-        "image": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456771811_card.jpg",
+        "image": null,
         "images": {
-          "avatar": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456771811_avatar.jpg",
-          "card": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456771811_card.jpg",
-          "cover": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774456559847_v-1774456771811_cover.jpg"
+          "avatar": null,
+          "card": null,
+          "cover": null
         },
-        "chapterFrom": "ch-1774186885948-zbwvr",
+        "chapterFrom": "ch-1774186885948-aaljk",
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "概述"
+          },
+          {
+            "type": "p",
+            "text": "正文"
+          }
+        ],
+        "relatedVersions": [
+          "v-1775994468111"
+        ],
+        "relatedCharacters": [],
+        "createdAt": 1775994837598
+      }
+    ],
+    "customSettingType": "法术设定"
+  },
+  {
+    "id": "non-1775995539520",
+    "type": "non-character",
+    "code": "N-012",
+    "camp": "",
+    "settingType": "world",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "defaultPinnedVersion": null,
+    "versions": [
+      {
+        "vid": "v-1775995539520",
+        "title": "“松节游击队”",
+        "subtitle": "以易谟戟与马聪为首的、以欺负向松松为首要目标的非官方小组。",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1775995539520
+      },
+      {
+        "vid": "v-1775995609701",
+        "title": "“松节游击队”",
+        "subtitle": "以易谟戟与马聪为首的、以欺负向松松为首要目标的非官方小组。不过在向松松彻底发生了变化后，现在看起来反倒像是魔法少女向日葵的第一个粉丝团了......这是怎么回事？！",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
         "chapterTo": null,
         "blocks": [],
         "relatedVersions": [
-          "v-1774456559847"
+          "v-1775995539520"
         ],
-        "relatedCharacters": [
-          {
-            "charId": "char-1774026694075-wyzxy3xpt",
-            "relationName": "偶遇"
-          },
-          {
-            "charId": "char-xiaoli",
-            "relationName": "堂......姐妹？"
-          },
-          {
-            "charId": "char-protagonist",
-            "relationName": "堂......姐妹？"
-          }
-        ],
-        "createdAt": 1774456771811
+        "relatedCharacters": [],
+        "createdAt": 1775995609701
       }
     ]
   },
   {
-    "id": "camp-1774456624605",
+    "id": "non-1776065054851",
     "type": "non-character",
-    "code": "N-007",
-    "settingType": "faction",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "versions": [
-      {
-        "vid": "v-default",
-        "title": "“家人”组",
-        "subtitle": "“家人”组相关设定",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "阵营简介"
-          },
-          {
-            "type": "p",
-            "text": "这是“家人”组的详细介绍。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774456624605
-      }
-    ]
-  },
-  {
-    "id": "camp-1774456669178",
-    "type": "non-character",
-    "code": "N-008",
-    "settingType": "faction",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "versions": [
-      {
-        "vid": "v-default",
-        "title": "塞坦科技",
-        "subtitle": "塞坦科技相关设定",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "阵营简介"
-          },
-          {
-            "type": "p",
-            "text": "这是塞坦科技的详细介绍。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774456669178
-      }
-    ]
-  },
-  {
-    "id": "camp-1774458879739",
-    "type": "non-character",
-    "code": "N-009",
-    "settingType": "faction",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "versions": [
-      {
-        "vid": "v-default",
-        "title": "⌈茶室⌋",
-        "subtitle": "⌈茶室⌋相关设定",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "阵营简介"
-          },
-          {
-            "type": "p",
-            "text": "这是⌈茶室⌋的详细介绍。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774458879739
-      }
-    ]
-  },
-  {
-    "id": "char-1774458852650",
-    "type": "character",
-    "code": "C-022",
-    "camp": "⌈茶室⌋",
-    "settingType": null,
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774458852650",
-        "title": "拾",
-        "subtitle": "⌈茶室⌋的管理员。No_325世界的张可云。\n不苟言笑的背后，掩藏着世界背后的秘密——\n——以及无数“张可云”的一生。",
-        "level": 2,
-        "image": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774458852650_v-1774458852650_card.jpg",
-        "images": {
-          "avatar": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774458852650_v-1774458852650_avatar.jpg",
-          "card": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774458852650_v-1774458852650_card.jpg",
-          "cover": "https://raw.githubusercontent.com/ZZQLittleBean/Wiki-Is-She-Also-me-Who-is-So-Cute-ZZQLTB.github.io/main/wiki-data/images/char-1774458852650_v-1774458852650_cover.jpg"
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "p",
-            "text": "事实上"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774458852650
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-mhuoc",
-    "type": "character",
-    "code": "C-071",
+    "code": "N-013",
     "camp": "",
+    "settingType": "custom",
     "pinned": false,
     "pinStartChapter": null,
     "pinEndChapter": null,
@@ -542,39 +714,49 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-9gla6",
-        "title": "宋罗汤",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
+        "vid": "v-1776065054851",
+        "title": "分神模式",
+        "subtitle": "塞坦科技的人脑终端“塞坦”的特有功能，会将使用者的意识拷贝并在设备周围短暂模拟出虚拟意识，类似“灵魂出窍”那种状态。\n感觉不太像是这个时代甚至是这个世界能存在的技术，可它就是这么明晃晃地出现在众人眼前了。",
+        "level": 4,
+        "image": "{{IMG:non-1776065054851_v-1776065054851_card.jpg}",
         "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
+          "avatar": "{{IMG:non-1776065054851_v-1776065054851_avatar.jpg}",
+          "card": "{{IMG:non-1776065054851_v-1776065054851_card.jpg}",
+          "cover": "{{IMG:non-1776065054851_v-1776065054851_cover.jpg}"
         },
-        "chapterFrom": null,
+        "chapterFrom": "ch-1774186885948-mhej7",
         "chapterTo": null,
         "blocks": [
           {
-            "type": "h2",
-            "text": "角色简介"
+            "type": "h3",
+            "text": "概述"
           },
           {
             "type": "p",
-            "text": "这是宋罗汤的角色词条。"
+            "text": "塞坦科技的人脑终端“塞坦”的特有功能。\n在设定的时间段内，该模式会将使用者的意识拷贝并在设备周围短暂模拟出虚拟意识，类似“灵魂出窍”那种状态。虚拟意识可以在一定空间中自由移动，配合塞坦科技的超级电脑还可有效扩展该范围。\n......听说存在某些潜在的问题，但研发部没有披露详细细节，故尚不明晰......"
+          },
+          {
+            "type": "h3",
+            "text": "功能详情"
+          },
+          {
+            "type": "p",
+            "text": "具体实现的机制较为复杂，甚至可以算得上是塞坦科技的绝密情报之一。\n不过可以确认一个基本流程：首先会将意识进行上传，然后进行虚拟激活——此时意识在身体中将会被临时冻结，防止重复唤醒，此时机体一般情况下就相当于类似“植物人”的状态。在这之后，终端周围方圆十米的一切景象将会被扫描建模成一个即时更新的“仓鼠球”，意识可以在仓鼠球内自由移动——如果有[[non-1776084810308|v-1776084810308:超级电脑]]的加持，范围甚至可以扩大到方圆100米。\n不过虚拟意识似乎还是会受到部分物理规则的限制，包括没法儿“穿墙”“遁地”之类的......这也算是有道理的设定，毕竟要是真的能穿墙，在终端彻底普及之后，某些让人不快的“串门儿”行为就要大肆兴起了。\n不过据技术部的公开资料显示，终端还能记录意识并标记统一识别码......奇怪，这么说总让人感觉终端实际可以控制的最小单位是“意识”或者说“灵魂”而非机体本身，控制“意识”进行离神不代表让身体直接失能——要是一个人有**两个、三个......甚至好几个**不同且完整的意识呢？\n“......笑话！”\n——当有员工问及此事时，塞坦科技的行政老总[[char-1774546471127-kxobi|v-1774546471127-o69xi:梅友乾]]如此笑道。"
           }
         ],
         "relatedVersions": [],
         "relatedCharacters": [],
-        "createdAt": 1774546471127
+        "createdAt": 1776065054851
       }
-    ]
+    ],
+    "customSettingType": "术语"
   },
   {
-    "id": "char-1774546471127-r9kwo",
-    "type": "character",
-    "code": "C-072",
+    "id": "non-1776084810308",
+    "type": "non-character",
+    "code": "N-014",
     "camp": "",
+    "settingType": "custom",
     "pinned": false,
     "pinStartChapter": null,
     "pinEndChapter": null,
@@ -583,10 +765,10 @@
     "defaultPinnedVersion": null,
     "versions": [
       {
-        "vid": "v-1774546471127-p3314",
-        "title": "马文一",
-        "subtitle": "",
-        "level": 3,
+        "vid": "v-1776084810308",
+        "title": "超级电脑",
+        "subtitle": "孙小孙送给张可云的生日礼物，塞坦科技的旗舰产品，运算能力一流......不过张可云看在这台电脑其实是孙小孙淘汰下来的款式的份儿上，似乎有点嫌弃。",
+        "level": 4,
         "image": null,
         "images": {
           "avatar": null,
@@ -597,18 +779,19 @@
         "chapterTo": null,
         "blocks": [
           {
-            "type": "h2",
-            "text": "角色简介"
+            "type": "h3",
+            "text": "概述"
           },
           {
             "type": "p",
-            "text": "这是马文一的角色词条。"
+            "text": "[[char-1774456559847|v-1774456559847:孙小孙]]送给[[char-xiaoli|v-1774543291292:张可云]]的生日礼物，塞坦科技的旗舰产品，运算能力一流......不过张可云看在这台电脑其实是孙小孙淘汰下来的款式的份儿上，似乎有点嫌弃。\n整体成一个看起来很容易变得灰扑扑的黑色匣子形状。\n不过单论功能，这台电脑确实仍然处于超脱时代的范畴，比如说整整10TB的存储、72GB的运行内存......但张可云貌似真的不太关心这些事情，哪怕她还是班上的电教委员——\n——难道说，是单纯讨厌孙小孙这种抠门的性格？\n**引用了本词条的词条**：\n[[non-1776065054851|v-1776065054851:分神模式]]"
           }
         ],
         "relatedVersions": [],
         "relatedCharacters": [],
-        "createdAt": 1774546471127
+        "createdAt": 1776084810308
       }
-    ]
+    ],
+    "customSettingType": "物件"
   }
 ]
