@@ -738,103 +738,161 @@ Object.assign(window.app, {
         // 【新增】自动修复缺失的图片引用（根据远程图片列表自动补全）
     // 在 wiki-github-core.js 中替换 autoFixImageReferences 方法
     async autoFixImageReferences() {
-        try {
-            console.log('[AutoFix] 🚀 开始自动修复图片引用...');
-            
-            if (!this.data?.entries || this.data.entries.length === 0) {
-                console.warn('[AutoFix] 暂无条目数据');
-                return 0;
-            }
-            
-            // 获取图片列表（带重试）
-            let imageList = [];
-            for (let i = 0; i < 3; i++) {
-                try {
-                    imageList = await this.githubStorage.getImageList();
-                    if (imageList.length > 0) break;
-                    await new Promise(r => setTimeout(r, 1000));
-                } catch (e) { /* 忽略 */ }
-            }
-            
-            if (!imageList || imageList.length === 0) {
-                console.error('[AutoFix] ❌ 无法获取远程图片列表');
-                return 0;
-            }
-            
-            console.log(`[AutoFix] 获取到 ${imageList.length} 个远程图片`);
-            
-            // 【关键修复】使用与手动代码完全一致的简单匹配逻辑
-            const imageSet = new Set(imageList.map(p => p.split('/').pop()));
-            
-            let fixedCount = 0;
-            
-            this.data.entries.forEach(entry => {
-                if (!entry.versions) return;
-                
-                entry.versions.forEach(v => {
-                    // 确保 images 对象存在（与手动代码一致）
-                    if (!v.images || typeof v.images !== 'object') {
-                        v.images = { avatar: null, card: null, cover: null };
-                    }
-                    
-                    // 预期的文件名（与手动代码完全一致）
-                    const files = {
-                        avatar: `${entry.id}_${v.vid}_avatar.jpg`,
-                        card: `${entry.id}_${v.vid}_card.jpg`,
-                        cover: `${entry.id}_${v.vid}_cover.jpg`
-                    };
-                    
-                    // 检查每个类型（与手动代码一致的简单逻辑）
-                    ['avatar', 'card', 'cover'].forEach(type => {
-                        const current = v.images[type];
-                        
-                        // 只有空值、data: 或 blob: 才需要修复（避免覆盖已有 URL）
-                        if (!current || current.startsWith('data:') || current.startsWith('blob:')) {
-                            if (imageSet.has(files[type])) {
-                                v.images[type] = `{{IMG:${files[type]}}`;
-                                console.log(`[AutoFix] ✅ ${entry.code} -> ${files[type]}`);
-                                fixedCount++;
-                            }
-                        }
-                    });
-                    
-                    // 同步旧版 image 字段
-                    v.image = v.images?.card || v.images?.avatar || v.images?.cover || v.image;
-                });
-            });
-            
-            console.log(`[AutoFix] 建立了 ${fixedCount} 个引用`);
-            
-            if (fixedCount > 0) {
-                // 解析为完整 URL
-                this.resolveImageReferences();
-                
-                // 刷新显示
-                setTimeout(() => {
-                    this.router(this.data.currentTarget || 'home', false);
-                }, 100);
-                
-                // 后台模式自动保存（延迟避免冲突）
-                if (this.runMode === 'backend' && this.backendLoggedIn) {
-                    setTimeout(async () => {
-                        try {
-                            await this.saveDataAtomic();
-                            console.log('[AutoFix] ✅ 已自动保存到 GitHub');
-                        } catch (e) {
-                            console.error('[AutoFix] 自动保存失败:', e);
-                        }
-                    }, 3000);
-                }
-            } else {
-                console.warn('[AutoFix] ⚠️ 未匹配到任何图片，请检查文件名格式');
-            }
-            
-            return fixedCount;
-            
-        } catch (e) {
-            console.error('[AutoFix] 💥 错误:', e);
+        console.log('[AutoFix] === 开始三段式顺序修复 ===');
+        
+        // 【第一段】建立 {{IMG:...}} 引用（同步执行）
+        console.log('[AutoFix] 第一段：建立图片引用...');
+        
+        let fixedCount = 0;
+        
+        // 获取图片列表（ await 等待完成）
+        const imageList = await this.githubStorage.getImageList();
+        console.log(`[AutoFix] 获取到 ${imageList.length} 个远程图片`);
+        
+        if (imageList.length === 0) {
+            console.error('[AutoFix] 无图片，中止');
             return 0;
         }
+        
+        // 建立 Set（同步）
+        const imageSet = new Set(imageList.map(p => {
+            const parts = p.split('/');
+            return parts[parts.length - 1];
+        }));
+        
+        console.log('[AutoFix] 开始遍历 entries...');
+        
+        // 同步遍历（不使用 forEach，使用 for...of 确保顺序）
+        for (let i = 0; i < this.data.entries.length; i++) {
+            const entry = this.data.entries[i];
+            if (!entry.versions) continue;
+            
+            for (let j = 0; j < entry.versions.length; j++) {
+                const v = entry.versions[j];
+                
+                // 确保 images 对象存在
+                if (!v.images || typeof v.images !== 'object') {
+                    v.images = { avatar: null, card: null, cover: null };
+                }
+                
+                // 定义三种类型
+                const types = ['avatar', 'card', 'cover'];
+                
+                for (let k = 0; k < types.length; k++) {
+                    const type = types[k];
+                    const filename = `${entry.id}_${v.vid}_${type}.jpg`;
+                    
+                    // 检查是否需要修复（当前为空或 base64）
+                    const current = v.images[type];
+                    const needsFix = !current || current.startsWith('data:') || current.startsWith('blob:');
+                    
+                    if (needsFix && imageSet.has(filename)) {
+                        // 【关键】直接修改对象属性
+                        v.images[type] = `{{IMG:${filename}}`;
+                        fixedCount++;
+                        console.log(`[修复] ${entry.code} -> ${filename}`);
+                    }
+                }
+                
+                // 同步旧版字段
+                v.image = v.images.card || v.images.avatar || v.images.cover || v.image;
+            }
+        }
+        
+        console.log(`[AutoFix] 第一段完成：建立了 ${fixedCount} 个引用`);
+        
+        // 【第二段】解析为完整 URL（立即执行，不延迟）
+        console.log('[AutoFix] 第二段：解析 URL...');
+        
+        const cfg = this.githubStorage.config;
+        const baseUrl = `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.dataPath}/images/`;
+        
+        let resolvedCount = 0;
+        
+        for (let i = 0; i < this.data.entries.length; i++) {
+            const entry = this.data.entries[i];
+            if (!entry.versions) continue;
+            
+            for (let j = 0; j < entry.versions.length; j++) {
+                const v = entry.versions[j];
+                if (!v.images) continue;
+                
+                const types = ['avatar', 'card', 'cover'];
+                for (let k = 0; k < types.length; k++) {
+                    const type = types[k];
+                    const val = v.images[type];
+                    
+                    if (typeof val === 'string' && val.startsWith('{{IMG:')) {
+                        // 提取文件名
+                        const match = val.match(/\{\{IMG:(.+)\}\}/);
+                        if (match && match[1]) {
+                            v.images[type] = baseUrl + encodeURIComponent(match[1]);
+                            resolvedCount++;
+                        }
+                    }
+                }
+                
+                // 更新旧版字段
+                v.image = v.images.card || v.images.avatar || v.images.cover || v.image;
+            }
+        }
+        
+        console.log(`[AutoFix] 第二段完成：解析了 ${resolvedCount} 个 URL`);
+        
+        // 【第三段】修复截断（立即执行）
+        console.log('[AutoFix] 第三段：修复截断...');
+        
+        let truncationFixed = 0;
+        
+        for (let i = 0; i < this.data.entries.length; i++) {
+            const entry = this.data.entries[i];
+            if (!entry.versions) continue;
+            
+            for (let j = 0; j < entry.versions.length; j++) {
+                const v = entry.versions[j];
+                if (!v.images) continue;
+                
+                const types = ['avatar', 'card', 'cover'];
+                for (let k = 0; k < types.length; k++) {
+                    const type = types[k];
+                    let val = v.images[type];
+                    
+                    if (!val || typeof val !== 'string') continue;
+                    
+                    let changed = false;
+                    
+                    // 场景1: URL 以 .jp 结尾
+                    if (val.endsWith('.jp') && !val.endsWith('.jpg')) {
+                        val = val + 'g';
+                        changed = true;
+                    }
+                    // 场景2: {{IMG:...}} 内被截断
+                    else if (val.includes('{{IMG:') && val.endsWith('.jp}}')) {
+                        val = val.slice(0, -5) + '.jpg}}';
+                        changed = true;
+                    }
+                    
+                    if (changed) {
+                        v.images[type] = val;
+                        truncationFixed++;
+                        console.log(`[截断修复] ${entry.code}.${type}`);
+                    }
+                }
+                
+                v.image = v.images?.card || v.images?.avatar || v.images?.cover || v.image;
+            }
+        }
+        
+        console.log(`[AutoFix] 第三段完成：修复了 ${truncationFixed} 处截断`);
+        
+        // 刷新页面显示
+        console.log('[AutoFix] 刷新页面...');
+        this.router(this.data.currentTarget || 'home', false);
+        
+        const totalFixed = fixedCount + truncationFixed;
+        console.log(`[AutoFix] === 完成，共处理 ${totalFixed} 处 ===`);
+        
+        return totalFixed;
     },
 
     // 【完整替换】renderHome 函数 - 修复显示逻辑
@@ -3539,9 +3597,11 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
             progress.update(10, mode === 'replace' ? '清空现有数据...' : '准备合并...');
             
             if (mode === 'replace') {
-                this.initDefaultData();
-                this.data.backendLoggedIn = this.backendLoggedIn;
-                this.data.runMode = this.runMode;
+                // 只重置特定字段，保留 entries 直到新数据加载完成
+                this.data.chapters = [];
+                this.data.synopsis = [];
+                this.data.camps = [];
+                // 不要在这里清空 entries！
             }
             
             // 合并设置
@@ -3605,7 +3665,9 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
                     if (!existing.has(item[key])) target.push(item);
                 });
             };
-            
+            if (!importedData.entries || importedData.entries.length === 0) {
+                throw new Error('导入文件中没有词条数据，中止导入以防止数据丢失');
+            }
             mergeArray(this.data.chapters, importedData.chapters || importedData.data?.chapters);
             mergeArray(this.data.camps, importedData.camps || importedData.data?.camps);
             mergeArray(this.data.announcements, importedData.announcements || importedData.data?.announcements);
