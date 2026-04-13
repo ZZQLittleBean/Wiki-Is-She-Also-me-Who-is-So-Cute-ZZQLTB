@@ -1,13 +1,8 @@
 {
   "version": "2.7.0-sharded",
-  "lastUpdate": 1776093836277,
+  "lastUpdate": 1776096489242,
   "totalEntries": 78,
-  "entryFiles": [
-    "entries-0.json",
-    "entries-1.json",
-    "entries-2.json",
-    "entries-3.json"
-  ],
+  "entryFiles": [],
   "settings": {
     "name": "听说这个Wiki的标题经常被张可云吃掉",
     "subtitle": "反正就是嗷呜一口~By ZZQLittleBean\n（Powered by Kimi AI）",
@@ -272,8 +267,13 @@
   ],
   "camps": [
     "主角团",
-    "反派",
-    "中立"
+    "反派组织",
+    "访客组",
+    "ZZQ小豆同学的主角区间",
+    "“家人”组",
+    "塞坦科技",
+    "⌈茶室⌋",
+    "同学组A"
   ],
   "synopsis": [
     {
