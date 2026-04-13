@@ -2072,11 +2072,11 @@ Object.assign(window.app, {
                     text = text.replace(/__(.+?)__/g, '<u>$1</u>');
                     
                     // 11. HTML 标签转义（防止 XSS）- 将剩余的 < > 转为实体
-                    text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    //text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                     
                     // 12. 恢复允许的 HTML 标签（b, i, u, br, del）- 将授权的实体转回标签
-                    text = text.replace(/&lt;(b|i|u|br|del)\s*\/?&gt;/g, '<$1>');
-                    text = text.replace(/&lt;\/(b|i|u|del)&gt;/g, '</$1>');
+                    //text = text.replace(/&lt;(b|i|u|br|del)\s*\/?&gt;/g, '<$1>');
+                    //text = text.replace(/&lt;\/(b|i|u|del)&gt;/g, '</$1>');
                     
                     // 13. 处理换行符（\n -> <br>）- 兼容本地版 Enter 换行
                     text = text.replace(/\n/g, '<br>');
