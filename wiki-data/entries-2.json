@@ -1,87 +1,5 @@
 [
   {
-    "id": "char-1774546471127-mflbk",
-    "type": "character",
-    "code": "C-039",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-fdozi",
-        "title": "冯珅",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是冯珅的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
-    "id": "char-1774546471127-k8txp",
-    "type": "character",
-    "code": "C-040",
-    "camp": "",
-    "pinned": false,
-    "pinStartChapter": null,
-    "pinEndChapter": null,
-    "pinnedVersions": {},
-    "missingIntervalVersion": null,
-    "defaultPinnedVersion": null,
-    "versions": [
-      {
-        "vid": "v-1774546471127-xxahu",
-        "title": "陈番淑",
-        "subtitle": "",
-        "level": 3,
-        "image": null,
-        "images": {
-          "avatar": null,
-          "card": null,
-          "cover": null
-        },
-        "chapterFrom": null,
-        "chapterTo": null,
-        "blocks": [
-          {
-            "type": "h2",
-            "text": "角色简介"
-          },
-          {
-            "type": "p",
-            "text": "这是陈番淑的角色词条。"
-          }
-        ],
-        "relatedVersions": [],
-        "relatedCharacters": [],
-        "createdAt": 1774546471127
-      }
-    ]
-  },
-  {
     "id": "char-1774546471127-8d22x",
     "type": "character",
     "code": "C-041",
@@ -816,6 +734,87 @@
         "relatedVersions": [],
         "relatedCharacters": [],
         "createdAt": 1774546471127
+      }
+    ]
+  },
+  {
+    "id": "camp-1774456624605",
+    "type": "non-character",
+    "code": "N-007",
+    "settingType": "faction",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "versions": [
+      {
+        "vid": "v-default",
+        "title": "“家人”组",
+        "subtitle": "“家人”组相关设定",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "阵营简介"
+          },
+          {
+            "type": "p",
+            "text": "这是“家人”组的详细介绍。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774456624605
+      }
+    ],
+    "defaultPinnedVersion": null
+  },
+  {
+    "id": "camp-1774456669178",
+    "type": "non-character",
+    "code": "N-008",
+    "settingType": "faction",
+    "pinned": false,
+    "pinStartChapter": null,
+    "pinEndChapter": null,
+    "pinnedVersions": {},
+    "missingIntervalVersion": null,
+    "versions": [
+      {
+        "vid": "v-default",
+        "title": "塞坦科技",
+        "subtitle": "塞坦科技相关设定",
+        "level": 3,
+        "image": null,
+        "images": {
+          "avatar": null,
+          "card": null,
+          "cover": null
+        },
+        "chapterFrom": null,
+        "chapterTo": null,
+        "blocks": [
+          {
+            "type": "h2",
+            "text": "阵营简介"
+          },
+          {
+            "type": "p",
+            "text": "这是塞坦科技的详细介绍。"
+          }
+        ],
+        "relatedVersions": [],
+        "relatedCharacters": [],
+        "createdAt": 1774456669178
       }
     ]
   }
