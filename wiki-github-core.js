@@ -2249,11 +2249,11 @@ Object.assign(window.app, {
             this.loadShareCodeList(clone.getElementById('share-code-list'));
         }
         
-        container.appendChild(clone);
-        setTimeout(() => {
-            const settingsContainer = document.getElementById('settings-container') || document.getElementById('main-container');
-            if (!settingsContainer || document.getElementById('repair-images-section')) return;
-            
+        // 【关键修复】在模板内容中直接插入图片修复按钮（而不是插入到container后再查找）
+        // 查找设置页面的主要内容区域（通常是最后一个section或特定容器）
+        const settingsForm = clone.querySelector('form') || clone.querySelector('.space-y-6') || clone.querySelector('div[class*="max-w"]');
+        
+        if (settingsForm) {
             const repairSection = document.createElement('div');
             repairSection.id = 'repair-images-section';
             repairSection.className = 'mt-8 p-6 bg-amber-50 border-2 border-amber-200 rounded-xl';
@@ -2266,234 +2266,74 @@ Object.assign(window.app, {
                     此操作会扫描远程仓库中的所有图片，并与本地词条进行匹配。
                 </p>
                 <div class="flex gap-3">
-                    <button id="btn-repair-images" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2">
+                    <button type="button" id="btn-repair-images" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2">
                         <i class="fa-solid fa-wrench"></i> 立即修复引用
                     </button>
-                    <button id="btn-save-after-repair" class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2 hidden">
+                    <button type="button" id="btn-save-after-repair" class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2 hidden">
                         <i class="fa-solid fa-save"></i> 保存修复结果
                     </button>
                 </div>
                 <div id="repair-result-text" class="mt-3 text-sm text-gray-600 hidden"></div>
             `;
             
-            settingsContainer.appendChild(repairSection);
+            // 插入到表单末尾
+            settingsForm.appendChild(repairSection);
             
-            // 绑定按钮事件
-            document.getElementById('btn-repair-images').onclick = async function() {
-                const btn = this;
-                const saveBtn = document.getElementById('btn-save-after-repair');
+            // 【关键】立即绑定事件（在添加到DOM之前就可以绑定，但保险起见用事件委托或确保元素已存在）
+            // 使用延迟确保元素已在DOM中
+            setTimeout(() => {
+                const btnRepair = document.getElementById('btn-repair-images');
+                const btnSave = document.getElementById('btn-save-after-repair');
                 const resultText = document.getElementById('repair-result-text');
                 
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在修复...';
-                resultText.classList.remove('hidden');
-                resultText.textContent = '正在获取远程图片列表...';
-                
-                try {
-                    const fixed = await app.autoFixImageReferences();
-                    
-                    if (fixed > 0) {
-                        resultText.innerHTML = `<span class="text-green-600 font-medium">✅ 成功建立 ${fixed} 个图片引用</span>`;
-                        btn.innerHTML = '<i class="fa-solid fa-check"></i> 修复完成';
+                if (btnRepair) {
+                    btnRepair.onclick = async () => {
+                        btnRepair.disabled = true;
+                        btnRepair.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在修复...';
+                        resultText.classList.remove('hidden');
+                        resultText.textContent = '正在获取远程图片列表...';
                         
-                        // 如果是后台模式，显示保存按钮
-                        if (app.runMode === 'backend') {
-                            saveBtn.classList.remove('hidden');
-                        }
-                    } else {
-                        resultText.innerHTML = `<span class="text-amber-600">⚠️ 未找到需要修复的图片引用</span><br><span class="text-xs text-gray-500">可能原因：1. 图片未上传到仓库 2. 文件名不匹配（期望格式：{entryId}_{versionId}_card.jpg）</span>`;
-                        btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 未匹配';
-                    }
-                } catch (e) {
-                    resultText.innerHTML = `<span class="text-red-600">❌ 修复失败: ${e.message}</span>`;
-                    btn.innerHTML = '<i class="fa-solid fa-times"></i> 重试';
-                    btn.disabled = false;
-                }
-            };
-            
-            document.getElementById('btn-save-after-repair').onclick = async function() {
-                if (confirm('确定将修复后的图片引用保存到 GitHub？')) {
-                    this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 保存中...';
-                    try {
-                        await app.saveDataAtomic();
-                        alert('✅ 已保存！图片引用已永久写入 GitHub。');
-                        this.classList.add('hidden');
-                    } catch (e) {
-                        alert('❌ 保存失败: ' + e.message);
-                        this.innerHTML = '<i class="fa-solid fa-save"></i> 重试保存';
-                    }
-                }
-            };
-        }, 100); // 延迟确保 DOM 已渲染
-        
-        // 【新增】安全图片修复工具区域（后台模式显示）
-        if (this.runMode === 'backend') {
-            const repairSection = document.createElement('div');
-            repairSection.className = 'mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg';
-            repairSection.innerHTML = `
-                <h4 class="font-bold text-amber-800 mb-2 flex items-center gap-2">
-                    <i class="fa-solid fa-wrench"></i> 图片引用修复工具
-                </h4>
-                <p class="text-xs text-amber-700 mb-3">
-                    如果导入后图片不显示，可尝试修复。此操作仅重建图片引用，不会删除词条数据。
-                </p>
-                <div class="flex gap-2">
-                    <button id="btn-repair-images" class="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm transition flex items-center justify-center gap-1">
-                        <i class="fa-solid fa-magic"></i> 检测并修复图片
-                    </button>
-                    <button id="btn-save-repair" class="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition flex items-center justify-center gap-1 hidden">
-                        <i class="fa-solid fa-save"></i> 保存修复结果
-                    </button>
-                </div>
-                <div id="repair-status" class="mt-2 text-xs text-gray-600 hidden"></div>
-                <div id="repair-detail" class="mt-1 text-[10px] text-gray-500 font-mono hidden"></div>
-            `;
-            
-            // 插入到容器末尾或找到合适的插入点
-            const settingsContainer = container.querySelector('#settings-container') || container;
-            settingsContainer.appendChild(repairSection);
-            
-            let fixedCount = 0;
-            let repairLog = [];
-            
-            // 绑定修复按钮事件
-            document.getElementById('btn-repair-images').addEventListener('click', async () => {
-                const btn = document.getElementById('btn-repair-images');
-                const saveBtn = document.getElementById('btn-save-repair');
-                const status = document.getElementById('repair-status');
-                const detail = document.getElementById('repair-detail');
-                
-                btn.disabled = true;
-                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 检测中...';
-                status.classList.remove('hidden');
-                detail.classList.remove('hidden');
-                status.textContent = '正在获取远程图片列表...';
-                detail.textContent = '';
-                repairLog = [];
-                
-                try {
-                    // 步骤 1: 获取图片列表（带重试）
-                    let imageList = [];
-                    let retries = 0;
-                    while (retries < 3) {
                         try {
-                            imageList = await this.githubStorage.getImageList();
-                            if (imageList.length > 0) break;
-                        } catch (e) {
-                            console.warn(`获取图片列表失败，重试 ${retries + 1}/3...`);
-                        }
-                        retries++;
-                        await new Promise(r => setTimeout(r, 1000));
-                    }
-                    
-                    status.textContent = `找到 ${imageList.length} 个远程图片，正在匹配条目...`;
-                    repairLog.push(`远程图片: ${imageList.length}个`);
-                    
-                    // 步骤 2: 匹配并修复（仅内存操作，不保存）
-                    fixedCount = 0;
-                    const imageSet = new Set(imageList);
-                    let checkedVersions = 0;
-                    
-                    this.data.entries.forEach((entry, idx) => {
-                        if (!entry.versions) return;
-                        
-                        entry.versions.forEach(v => {
-                            checkedVersions++;
+                            const fixed = await this.autoFixImageReferences();
                             
-                            // 确保 images 对象存在
-                            if (!v.images || typeof v.images !== 'object') {
-                                v.images = { avatar: null, card: null, cover: null };
-                            }
-                            
-                            // 检查每个图片类型
-                            ['avatar', 'card', 'cover'].forEach(type => {
-                                const expectedFile = `${entry.id}_${v.vid}_${type}.jpg`;
+                            if (fixed > 0) {
+                                resultText.innerHTML = `<span class="text-green-600 font-medium">✅ 成功建立 ${fixed} 个图片引用</span>`;
+                                btnRepair.innerHTML = '<i class="fa-solid fa-check"></i> 修复完成';
                                 
-                                // 如果远程存在该文件，建立引用
-                                if (imageSet.has(expectedFile)) {
-                                    // 只有当当前值为空或base64时才覆盖
-                                    const current = v.images[type];
-                                    if (!current || current.startsWith('data:') || current.startsWith('blob:')) {
-                                        v.images[type] = `{{IMG:${expectedFile}}`;
-                                        fixedCount++;
-                                        repairLog.push(`${entry.code} → ${expectedFile}`);
-                                    }
+                                if (this.runMode === 'backend' && btnSave) {
+                                    btnSave.classList.remove('hidden');
                                 }
-                            });
-                            
-                            // 同步旧版 image 字段
-                            v.image = v.images?.card || v.images?.avatar || v.images?.cover || v.image;
-                        });
-                    });
-                    
-                    repairLog.push(`检查版本: ${checkedVersions}个`);
-                    repairLog.push(`修复引用: ${fixedCount}个`);
-                    
-                    // 步骤 3: 解析 URL（仅内存中）
-                    if (fixedCount > 0) {
-                        this.resolveImageReferences();
-                        status.innerHTML = `✅ 成功修复 ${fixedCount} 个图片引用<br>点击"保存修复结果"永久生效`;
-                        detail.textContent = repairLog.slice(0, 5).join(' | ') + (repairLog.length > 5 ? ` ...等${repairLog.length}条` : '');
-                        saveBtn.classList.remove('hidden');
-                    } else {
-                        status.textContent = 'ℹ️ 未找到需要修复的图片引用（可能已全部正确，或图片未上传）';
-                        detail.textContent = `检查了 ${checkedVersions} 个版本，未匹配到缺失引用的远程图片`;
-                        saveBtn.classList.add('hidden');
-                    }
-                    
-                    btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> 修复完成';
-                    btn.disabled = false;
-                    
-                    // 刷新当前视图以显示图片
-                    const currentTarget = this.data.currentTarget || 'home';
-                    setTimeout(() => this.router(currentTarget, false), 300);
-                    
-                } catch (e) {
-                    console.error('[Repair] 修复失败:', e);
-                    status.textContent = '❌ 修复失败: ' + e.message;
-                    detail.textContent = '请检查控制台获取详细错误信息';
-                    btn.disabled = false;
-                    btn.innerHTML = '<i class="fa-solid fa-magic mr-1"></i> 重试';
-                    saveBtn.classList.add('hidden');
-                }
-            });
-            
-            // 绑定保存按钮事件
-            document.getElementById('btn-save-repair').addEventListener('click', async () => {
-                const saveBtn = document.getElementById('btn-save-repair');
-                const status = document.getElementById('repair-status');
-                
-                if (!confirm(`确定保存修复结果到 GitHub？\n\n将保存 ${fixedCount} 个图片引用到 data.json。`)) {
-                    return;
+                            } else {
+                                resultText.innerHTML = `<span class="text-amber-600">⚠️ 未找到需要修复的图片引用</span><br><span class="text-xs text-gray-500">可能原因：1. 图片未上传到仓库 2. 文件名不匹配</span>`;
+                                btnRepair.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 未匹配';
+                            }
+                        } catch (e) {
+                            resultText.innerHTML = `<span class="text-red-600">❌ 修复失败: ${e.message}</span>`;
+                            btnRepair.innerHTML = '<i class="fa-solid fa-times"></i> 重试';
+                            btnRepair.disabled = false;
+                        }
+                    };
                 }
                 
-                saveBtn.disabled = true;
-                saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 保存中...';
-                
-                try {
-                    // 【关键】保存前再次检查数据完整性，防止保存空数据
-                    if (!this.data.entries || this.data.entries.length === 0) {
-                        throw new Error('数据异常：entries 为空，拒绝保存以防止数据丢失');
-                    }
-                    
-                    await this.saveDataAtomic();
-                    
-                    status.innerHTML = '✅ 已永久保存到 GitHub！刷新后仍然有效';
-                    saveBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> 已保存';
-                    setTimeout(() => {
-                        saveBtn.classList.add('hidden');
-                        saveBtn.disabled = false;
-                        saveBtn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> 保存修复结果';
-                    }, 3000);
-                    
-                } catch (e) {
-                    console.error('[Repair] 保存失败:', e);
-                    status.textContent = '❌ 保存失败: ' + e.message;
-                    saveBtn.disabled = false;
-                    saveBtn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> 重试保存';
+                if (btnSave) {
+                    btnSave.onclick = async () => {
+                        if (confirm('确定将修复后的图片引用保存到 GitHub？')) {
+                            btnSave.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 保存中...';
+                            try {
+                                await this.saveDataAtomic();
+                                alert('✅ 已保存！图片引用已永久写入 GitHub。');
+                                btnSave.classList.add('hidden');
+                            } catch (e) {
+                                alert('❌ 保存失败: ' + e.message);
+                                btnSave.innerHTML = '<i class="fa-solid fa-save"></i> 重试保存';
+                            }
+                        }
+                    };
                 }
-            });
+            }, 50); // 短延迟确保DOM已渲染
         }
+        
+        container.appendChild(clone);
     },
 
     // ========== 剧情梗概 ==========
