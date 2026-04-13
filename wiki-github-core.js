@@ -454,12 +454,31 @@ Object.assign(window.app, {
             const isSharded = baseData.version && baseData.version.includes('sharded');
             
             if (isSharded && baseData.entryFiles && baseData.entryFiles.length > 0) {
-                console.log('[Wiki] 检测到分片数据，开始加载...');
-                entries = await this.loadShardedData(baseData);
-            } else {
-                entries = baseData.entries || [];
-                console.log('[Wiki] 使用非分片数据，条目数:', entries.length);
+            console.log('[Wiki] 检测到分片数据，开始加载...');
+            try {
+                const shardedEntries = await this.loadShardedData(baseData);
+                // 【关键保护】只有当分片加载成功且有条目时才使用
+                if (shardedEntries && shardedEntries.length > 0) {
+                    entries = shardedEntries;
+                    console.log('[Wiki] 分片加载成功，条目数:', entries.length);
+                } else {
+                    console.warn('[Wiki] ⚠️ 分片加载为空，保留已有数据');
+                    // 不要覆盖 entries，保持原值
+                    if (!entries || entries.length === 0) {
+                        entries = [];
+                    }
+                }
+            } catch (e) {
+                console.error('[Wiki] 分片加载失败:', e);
+                // 【关键保护】分片失败时不清空数据
+                if (!entries || entries.length === 0) {
+                    entries = this.data?.entries || [];
+                }
             }
+        } else {
+            entries = baseData.entries || [];
+            console.log('[Wiki] 使用非分片数据，条目数:', entries.length);
+        }
             
             // 【关键】合并数据到 this.data（确保 entries 已赋值）
             this.data = {
@@ -1140,7 +1159,15 @@ Object.assign(window.app, {
             console.log('[PeriodicCheck] 数据完整性检查通过');
         }
     },
+    // 替换 initDefaultData 方法 - 增加数据保护
     initDefaultData() {
+        // 【关键保护】如果已有数据，不要清空
+        if (this.data && this.data.entries && this.data.entries.length > 0) {
+            console.log('[Init] 检测到已有数据，跳过初始化');
+            return;
+        }
+        
+        console.log('[Init] 执行默认初始化...');
         this.data = {
             entries: [],
             chapters: [],
@@ -1151,7 +1178,6 @@ Object.assign(window.app, {
             customFields: {},
             currentTimeline: 'latest',
             currentMode: 'view',
-            // 【修复1】添加时间节点相关字段初始化，防止 undefined 错误
             timelineNodes: [],
             newReaderNodeId: null,
             latestNodeId: null,
@@ -2274,33 +2300,177 @@ Object.assign(window.app, {
             // 加载分享码列表
             this.loadShareCodeList(clone.getElementById('share-code-list'));
         }
-        const repairBtn = document.createElement('button');
-        repairBtn.className = 'mt-4 w-full py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg transition flex items-center justify-center gap-2';
-        repairBtn.innerHTML = '<i class="fa-solid fa-wrench"></i> 紧急修复图片引用';
-        repairBtn.onclick = async () => {
-            repairBtn.disabled = true;
-            repairBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 修复中...';
-            
-            try {
-                const count = await this.autoFixImageReferences();
-                if (count > 0) {
-                    await this.saveDataAtomic();
-                    alert(`修复完成！已建立 ${count} 个引用并保存。`);
-                } else {
-                    alert('未找到需要修复的图片引用。\n\n可能原因：\n1. 图片未上传到仓库\n2. 图片文件名不匹配\n3. 所有引用已正确');
-                }
-            } catch (e) {
-                alert('修复失败: ' + e.message);
-            } finally {
-                repairBtn.disabled = false;
-                repairBtn.innerHTML = '<i class="fa-solid fa-wrench"></i> 紧急修复图片引用';
-            }
-        };
-
-        // 添加到容器中（找到合适的 container 插入）
-        const container = document.getElementById('settings-container') || document.getElementById('main-container');
-        if (container) container.appendChild(repairBtn);
+        
         container.appendChild(clone);
+        
+        // 【新增】安全图片修复工具区域（后台模式显示）
+        if (this.runMode === 'backend') {
+            const repairSection = document.createElement('div');
+            repairSection.className = 'mt-6 p-4 bg-amber-50 border border-amber-200 rounded-lg';
+            repairSection.innerHTML = `
+                <h4 class="font-bold text-amber-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-wrench"></i> 图片引用修复工具
+                </h4>
+                <p class="text-xs text-amber-700 mb-3">
+                    如果导入后图片不显示，可尝试修复。此操作仅重建图片引用，不会删除词条数据。
+                </p>
+                <div class="flex gap-2">
+                    <button id="btn-repair-images" class="flex-1 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded text-sm transition flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-magic"></i> 检测并修复图片
+                    </button>
+                    <button id="btn-save-repair" class="flex-1 py-2 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition flex items-center justify-center gap-1 hidden">
+                        <i class="fa-solid fa-save"></i> 保存修复结果
+                    </button>
+                </div>
+                <div id="repair-status" class="mt-2 text-xs text-gray-600 hidden"></div>
+                <div id="repair-detail" class="mt-1 text-[10px] text-gray-500 font-mono hidden"></div>
+            `;
+            
+            // 插入到容器末尾或找到合适的插入点
+            const settingsContainer = container.querySelector('#settings-container') || container;
+            settingsContainer.appendChild(repairSection);
+            
+            let fixedCount = 0;
+            let repairLog = [];
+            
+            // 绑定修复按钮事件
+            document.getElementById('btn-repair-images').addEventListener('click', async () => {
+                const btn = document.getElementById('btn-repair-images');
+                const saveBtn = document.getElementById('btn-save-repair');
+                const status = document.getElementById('repair-status');
+                const detail = document.getElementById('repair-detail');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 检测中...';
+                status.classList.remove('hidden');
+                detail.classList.remove('hidden');
+                status.textContent = '正在获取远程图片列表...';
+                detail.textContent = '';
+                repairLog = [];
+                
+                try {
+                    // 步骤 1: 获取图片列表（带重试）
+                    let imageList = [];
+                    let retries = 0;
+                    while (retries < 3) {
+                        try {
+                            imageList = await this.githubStorage.getImageList();
+                            if (imageList.length > 0) break;
+                        } catch (e) {
+                            console.warn(`获取图片列表失败，重试 ${retries + 1}/3...`);
+                        }
+                        retries++;
+                        await new Promise(r => setTimeout(r, 1000));
+                    }
+                    
+                    status.textContent = `找到 ${imageList.length} 个远程图片，正在匹配条目...`;
+                    repairLog.push(`远程图片: ${imageList.length}个`);
+                    
+                    // 步骤 2: 匹配并修复（仅内存操作，不保存）
+                    fixedCount = 0;
+                    const imageSet = new Set(imageList);
+                    let checkedVersions = 0;
+                    
+                    this.data.entries.forEach((entry, idx) => {
+                        if (!entry.versions) return;
+                        
+                        entry.versions.forEach(v => {
+                            checkedVersions++;
+                            
+                            // 确保 images 对象存在
+                            if (!v.images || typeof v.images !== 'object') {
+                                v.images = { avatar: null, card: null, cover: null };
+                            }
+                            
+                            // 检查每个图片类型
+                            ['avatar', 'card', 'cover'].forEach(type => {
+                                const expectedFile = `${entry.id}_${v.vid}_${type}.jpg`;
+                                
+                                // 如果远程存在该文件，建立引用
+                                if (imageSet.has(expectedFile)) {
+                                    // 只有当当前值为空或base64时才覆盖
+                                    const current = v.images[type];
+                                    if (!current || current.startsWith('data:') || current.startsWith('blob:')) {
+                                        v.images[type] = `{{IMG:${expectedFile}}`;
+                                        fixedCount++;
+                                        repairLog.push(`${entry.code} → ${expectedFile}`);
+                                    }
+                                }
+                            });
+                            
+                            // 同步旧版 image 字段
+                            v.image = v.images?.card || v.images?.avatar || v.images?.cover || v.image;
+                        });
+                    });
+                    
+                    repairLog.push(`检查版本: ${checkedVersions}个`);
+                    repairLog.push(`修复引用: ${fixedCount}个`);
+                    
+                    // 步骤 3: 解析 URL（仅内存中）
+                    if (fixedCount > 0) {
+                        this.resolveImageReferences();
+                        status.innerHTML = `✅ 成功修复 ${fixedCount} 个图片引用<br>点击"保存修复结果"永久生效`;
+                        detail.textContent = repairLog.slice(0, 5).join(' | ') + (repairLog.length > 5 ? ` ...等${repairLog.length}条` : '');
+                        saveBtn.classList.remove('hidden');
+                    } else {
+                        status.textContent = 'ℹ️ 未找到需要修复的图片引用（可能已全部正确，或图片未上传）';
+                        detail.textContent = `检查了 ${checkedVersions} 个版本，未匹配到缺失引用的远程图片`;
+                        saveBtn.classList.add('hidden');
+                    }
+                    
+                    btn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> 修复完成';
+                    btn.disabled = false;
+                    
+                    // 刷新当前视图以显示图片
+                    const currentTarget = this.data.currentTarget || 'home';
+                    setTimeout(() => this.router(currentTarget, false), 300);
+                    
+                } catch (e) {
+                    console.error('[Repair] 修复失败:', e);
+                    status.textContent = '❌ 修复失败: ' + e.message;
+                    detail.textContent = '请检查控制台获取详细错误信息';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="fa-solid fa-magic mr-1"></i> 重试';
+                    saveBtn.classList.add('hidden');
+                }
+            });
+            
+            // 绑定保存按钮事件
+            document.getElementById('btn-save-repair').addEventListener('click', async () => {
+                const saveBtn = document.getElementById('btn-save-repair');
+                const status = document.getElementById('repair-status');
+                
+                if (!confirm(`确定保存修复结果到 GitHub？\n\n将保存 ${fixedCount} 个图片引用到 data.json。`)) {
+                    return;
+                }
+                
+                saveBtn.disabled = true;
+                saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i> 保存中...';
+                
+                try {
+                    // 【关键】保存前再次检查数据完整性，防止保存空数据
+                    if (!this.data.entries || this.data.entries.length === 0) {
+                        throw new Error('数据异常：entries 为空，拒绝保存以防止数据丢失');
+                    }
+                    
+                    await this.saveDataAtomic();
+                    
+                    status.innerHTML = '✅ 已永久保存到 GitHub！刷新后仍然有效';
+                    saveBtn.innerHTML = '<i class="fa-solid fa-check mr-1"></i> 已保存';
+                    setTimeout(() => {
+                        saveBtn.classList.add('hidden');
+                        saveBtn.disabled = false;
+                        saveBtn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> 保存修复结果';
+                    }, 3000);
+                    
+                } catch (e) {
+                    console.error('[Repair] 保存失败:', e);
+                    status.textContent = '❌ 保存失败: ' + e.message;
+                    saveBtn.disabled = false;
+                    saveBtn.innerHTML = '<i class="fa-solid fa-save mr-1"></i> 重试保存';
+                }
+            });
+        }
     },
 
     // ========== 剧情梗概 ==========
@@ -3804,70 +3974,160 @@ async importZipFile(zipFile, mode = 'ask', resumeFromShard = 0) {
         // 步骤 7: 保存数据（分片保存逻辑）
         progress.update(85, '正在保存数据...');
         
+        // 【关键保护】保存前强制检查数据完整性
+        const entriesToSave = this.data.entries || [];
+        if (entriesToSave.length === 0) {
+            console.error('[Import] ❌ 保存前检测到条目为空，中止保存！');
+            throw new Error('数据完整性检查失败：entries 为空，可能是合并过程中数据被意外清空');
+        }
+        
+        // 【关键保护】确保所有必要字段存在（防止后续渲染报错）
+        this.data.timelineNodes = this.data.timelineNodes || [];
+        this.data.newReaderNodeId = this.data.newReaderNodeId || null;
+        this.data.latestNodeId = this.data.latestNodeId || null;
+        this.ensureDefaultNodes();
+        
         const ENTRIES_PER_FILE = 20;
-        const totalEntries = this.data.entries.length;
+        const totalEntries = entriesToSave.length;
         const totalShards = Math.ceil(totalEntries / ENTRIES_PER_FILE);
         
+        // 构建基础数据（包含所有非条目数据）
         const baseData = {
             version: '2.7.0-sharded',
             lastUpdate: Date.now(),
             totalEntries: totalEntries,
             entryFiles: [],
-            settings: this.data.settings,
+            settings: this.data.settings || {},
             chapters: this.data.chapters || [],
             camps: this.data.camps || [],
             synopsis: this.data.synopsis || [],
             announcements: this.data.announcements || [],
             homeContent: this.data.homeContent || [],
             customFields: this.data.customFields || {},
-            // 【关键】保存时间节点数据
             timelineNodes: this.data.timelineNodes || [],
             newReaderNodeId: this.data.newReaderNodeId,
             latestNodeId: this.data.latestNodeId
         };
 
-        // 先保存基础结构
-        await this.githubStorage.putFile(
-            'data.json', 
-            JSON.stringify(baseData, null, 2), 
-            'Create index structure'
-        );
-
-        // 分片保存 entries（带延迟）
-        for (let i = 0; i < totalEntries; i += ENTRIES_PER_FILE) {
-            const shard = this.data.entries.slice(i, i + ENTRIES_PER_FILE);
-            const shardIndex = Math.floor(i / ENTRIES_PER_FILE);
-            const fileName = `entries-${shardIndex}.json`;
-            
-            await this.githubStorage.putFile(
-                fileName, 
-                JSON.stringify(shard, null, 2), 
-                `Update entries batch ${shardIndex}`
-            );
-            
-            baseData.entryFiles.push(fileName);
-            
-            // 更新进度
-            progress.update(
-                85 + (10 * (shardIndex + 1) / totalShards), 
-                `保存批次 ${shardIndex + 1}/${totalShards}...`
-            );
-            
-            // 批次间延迟避免限流
-            if (i + ENTRIES_PER_FILE < totalEntries) {
-                await new Promise(r => setTimeout(r, 1500));
+        // 【关键修复1】先保存基础结构（使用15次重试+初始延迟，应对409冲突）
+        let baseSaved = false;
+        for (let retry = 0; retry < 3; retry++) {
+            try {
+                // 首次尝试前等待，避免与之前操作冲突
+                if (retry === 0) await new Promise(r => setTimeout(r, 2000));
+                
+                await this.githubStorage.putFile(
+                    'data.json', 
+                    JSON.stringify(baseData, null, 2), 
+                    'Update index structure',
+                    false,
+                    15 // 强制15次重试
+                );
+                baseSaved = true;
+                console.log('[Import] ✅ 基础索引已保存');
+                break;
+            } catch (e) {
+                console.warn(`[Import] 基础索引保存尝试 ${retry + 1}/3 失败:`, e.message);
+                if (retry === 2) {
+                    throw new Error('基础索引保存失败（409冲突过多），建议等待1分钟后重试');
+                }
+                await new Promise(r => setTimeout(r, 5000 * (retry + 1))); // 递增延迟
             }
         }
 
-        // 更新最终索引
-        await this.githubStorage.putFile(
-            'data.json', 
-            JSON.stringify(baseData, null, 2), 
-            'Import complete'
-        );
+        // 分片保存 entries（带批次间延迟）
+        let savedShards = 0;
+        let failedShards = [];
+        
+        for (let i = 0; i < totalEntries; i += ENTRIES_PER_FILE) {
+            const shard = entriesToSave.slice(i, i + ENTRIES_PER_FILE);
+            const shardIndex = Math.floor(i / ENTRIES_PER_FILE);
+            const fileName = `entries-${shardIndex}.json`;
+            
+            let shardSaved = false;
+            
+            // 【关键修复2】批次间延迟（1000ms），避免GitHub API限流和409冲突
+            if (i > 0) {
+                await new Promise(r => setTimeout(r, 1000));
+            }
+            
+            // 每个分片独立重试3次
+            for (let retry = 0; retry < 3; retry++) {
+                try {
+                    await this.githubStorage.putFile(
+                        fileName, 
+                        JSON.stringify(shard, null, 2), 
+                        `Update entries batch ${shardIndex} (${i}-${Math.min(i + ENTRIES_PER_FILE, totalEntries)})`
+                    );
+                    
+                    savedShards++;
+                    shardSaved = true;
+                    baseData.entryFiles.push(fileName);
+                    break;
+                    
+                } catch (e) {
+                    console.warn(`[Import] 分片 ${fileName} 尝试 ${retry + 1}/3 失败:`, e.message);
+                    if (retry < 2) {
+                        // 分片失败等待时间递增
+                        await new Promise(r => setTimeout(r, 3000 * (retry + 1)));
+                    }
+                }
+            }
+            
+            if (!shardSaved) {
+                failedShards.push(fileName);
+                console.error(`[Import] ❌ 分片 ${fileName} 最终失败`);
+                // 【关键保护】即使分片失败，也记录文件名以便后续手动修复
+                baseData.entryFiles.push(fileName);
+            }
+            
+            // 更新进度：85% ~ 95%
+            progress.update(
+                85 + (10 * (shardIndex + 1) / totalShards), 
+                `保存批次 ${shardIndex + 1}/${totalShards} (${Math.min(i + ENTRIES_PER_FILE, totalEntries)}/${totalEntries})...`
+            );
+        }
 
-        // 最终确保时间节点（双重保险）
-        this.ensureDefaultNodes();
+        // 【关键修复3】最终索引保存前强制延迟，确保GitHub缓存已更新
+        progress.update(95, '最终确认中...');
+        await new Promise(r => setTimeout(r, 5000)); // 5秒延迟，确保所有分片可访问
+        
+        // 标记失败的分片（如果有）
+        if (failedShards.length > 0) {
+            baseData.failedShards = failedShards;
+            baseData.lastUpdate = Date.now();
+            console.warn(`[Import] ⚠️ 标记 ${failedShards.length} 个失败分片`);
+        }
+
+        // 【关键修复4】使用15次重试保存最终索引
+        let finalSaved = false;
+        for (let retry = 0; retry < 3; retry++) {
+            try {
+                await this.githubStorage.putFile(
+                    'data.json', 
+                    JSON.stringify(baseData, null, 2), 
+                    'Import complete',
+                    false,
+                    15
+                );
+                finalSaved = true;
+                console.log('[Import] ✅ 最终索引已保存');
+                break;
+            } catch (e) {
+                console.warn(`[Import] 最终索引尝试 ${retry + 1}/3 失败:`, e.message);
+                if (retry === 2) {
+                    // 【关键保护】最终索引失败不抛出错误，因为分片数据已保存
+                    console.error('[Import] ⚠️ 最终索引保存失败，但分片数据已保存，可手动修复');
+                    // 保存进度到 localStorage 以便恢复
+                    localStorage.setItem('wiki_import_recovery', JSON.stringify({
+                        baseData: baseData,
+                        failedShards: failedShards,
+                        timestamp: Date.now()
+                    }));
+                }
+                await new Promise(r => setTimeout(r, 10000 * (retry + 1))); // 更长延迟
+            }
+        }
 
         // 完成
         progress.update(100, '导入完成！');
