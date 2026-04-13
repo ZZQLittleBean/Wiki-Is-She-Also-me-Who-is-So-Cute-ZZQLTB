@@ -736,33 +736,22 @@ Object.assign(window.app, {
         return { fixed: fixedCount, issues };
     },
         // 【新增】自动修复缺失的图片引用（根据远程图片列表自动补全）
-    // 在 wiki-github-core.js 中替换 autoFixImageReferences 方法
+    // 在 wiki-github-core.js 中替换 autoFixImageReferences（关键修正版）
     async autoFixImageReferences() {
         console.log('[AutoFix] === 开始三段式顺序修复 ===');
         
-        // 【第一段】建立 {{IMG:...}} 引用（同步执行）
+        // 第一段：建立引用
         console.log('[AutoFix] 第一段：建立图片引用...');
         
         let fixedCount = 0;
-        
-        // 获取图片列表（ await 等待完成）
         const imageList = await this.githubStorage.getImageList();
         console.log(`[AutoFix] 获取到 ${imageList.length} 个远程图片`);
         
-        if (imageList.length === 0) {
-            console.error('[AutoFix] 无图片，中止');
-            return 0;
-        }
+        if (imageList.length === 0) return 0;
         
-        // 建立 Set（同步）
-        const imageSet = new Set(imageList.map(p => {
-            const parts = p.split('/');
-            return parts[parts.length - 1];
-        }));
+        const imageSet = new Set(imageList.map(p => p.split('/').pop()));
         
-        console.log('[AutoFix] 开始遍历 entries...');
-        
-        // 同步遍历（不使用 forEach，使用 for...of 确保顺序）
+        // 【关键修正 1】遍历 entries（使用 for 循环确保顺序）
         for (let i = 0; i < this.data.entries.length; i++) {
             const entry = this.data.entries[i];
             if (!entry.versions) continue;
@@ -775,20 +764,16 @@ Object.assign(window.app, {
                     v.images = { avatar: null, card: null, cover: null };
                 }
                 
-                // 定义三种类型
                 const types = ['avatar', 'card', 'cover'];
                 
                 for (let k = 0; k < types.length; k++) {
                     const type = types[k];
                     const filename = `${entry.id}_${v.vid}_${type}.jpg`;
                     
-                    // 检查是否需要修复（当前为空或 base64）
-                    const current = v.images[type];
-                    const needsFix = !current || current.startsWith('data:') || current.startsWith('blob:');
-                    
-                    if (needsFix && imageSet.has(filename)) {
-                        // 【关键】直接修改对象属性
-                        v.images[type] = `{{IMG:${filename}}`;
+                    // 【关键修正 2】直接覆盖，不检查当前值（确保能修正错误格式）
+                    if (imageSet.has(filename)) {
+                        // 【关键修正 3】使用双 }} 格式（与手动代码一致）
+                        v.images[type] = '{{IMG:' + filename + '}}';
                         fixedCount++;
                         console.log(`[修复] ${entry.code} -> ${filename}`);
                     }
@@ -801,12 +786,11 @@ Object.assign(window.app, {
         
         console.log(`[AutoFix] 第一段完成：建立了 ${fixedCount} 个引用`);
         
-        // 【第二段】解析为完整 URL（立即执行，不延迟）
+        // 第二段：解析 URL（立即执行）
         console.log('[AutoFix] 第二段：解析 URL...');
         
         const cfg = this.githubStorage.config;
         const baseUrl = `https://raw.githubusercontent.com/${cfg.owner}/${cfg.repo}/${cfg.branch}/${cfg.dataPath}/images/`;
-        
         let resolvedCount = 0;
         
         for (let i = 0; i < this.data.entries.length; i++) {
@@ -820,28 +804,31 @@ Object.assign(window.app, {
                 const types = ['avatar', 'card', 'cover'];
                 for (let k = 0; k < types.length; k++) {
                     const type = types[k];
-                    const val = v.images[type];
+                    let val = v.images[type];
                     
-                    if (typeof val === 'string' && val.startsWith('{{IMG:')) {
-                        // 提取文件名
-                        const match = val.match(/\{\{IMG:(.+)\}\}/);
+                    if (typeof val === 'string' && val.includes('{{IMG:')) {
+                        // 【关键修正 4】兼容单 } 和双 }} 格式
+                        const match = val.match(/\{\{IMG:\s*([^\}]+)\s*\}?\}/);
                         if (match && match[1]) {
-                            v.images[type] = baseUrl + encodeURIComponent(match[1]);
+                            let filename = match[1].trim();
+                            
+                            // 修复截断
+                            if (filename.endsWith('.jp') && !filename.endsWith('.jpg')) filename += 'g';
+                            
+                            v.images[type] = baseUrl + encodeURIComponent(filename);
                             resolvedCount++;
                         }
                     }
                 }
                 
-                // 更新旧版字段
                 v.image = v.images.card || v.images.avatar || v.images.cover || v.image;
             }
         }
         
         console.log(`[AutoFix] 第二段完成：解析了 ${resolvedCount} 个 URL`);
         
-        // 【第三段】修复截断（立即执行）
+        // 第三段：修复截断
         console.log('[AutoFix] 第三段：修复截断...');
-        
         let truncationFixed = 0;
         
         for (let i = 0; i < this.data.entries.length; i++) {
@@ -866,16 +853,10 @@ Object.assign(window.app, {
                         val = val + 'g';
                         changed = true;
                     }
-                    // 场景2: {{IMG:...}} 内被截断
-                    else if (val.includes('{{IMG:') && val.endsWith('.jp}}')) {
-                        val = val.slice(0, -5) + '.jpg}}';
-                        changed = true;
-                    }
                     
                     if (changed) {
                         v.images[type] = val;
                         truncationFixed++;
-                        console.log(`[截断修复] ${entry.code}.${type}`);
                     }
                 }
                 
@@ -885,14 +866,12 @@ Object.assign(window.app, {
         
         console.log(`[AutoFix] 第三段完成：修复了 ${truncationFixed} 处截断`);
         
-        // 刷新页面显示
-        console.log('[AutoFix] 刷新页面...');
+        // 刷新页面
         this.router(this.data.currentTarget || 'home', false);
         
-        const totalFixed = fixedCount + truncationFixed;
-        console.log(`[AutoFix] === 完成，共处理 ${totalFixed} 处 ===`);
-        
-        return totalFixed;
+        const total = fixedCount + truncationFixed;
+        console.log(`[AutoFix] === 完成，共处理 ${total} 处 ===`);
+        return total;
     },
 
     // 【完整替换】renderHome 函数 - 修复显示逻辑
