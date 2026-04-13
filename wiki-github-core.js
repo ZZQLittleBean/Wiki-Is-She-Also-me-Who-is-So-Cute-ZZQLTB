@@ -741,150 +741,98 @@ Object.assign(window.app, {
         try {
             console.log('[AutoFix] 🚀 开始自动修复图片引用...');
             
-            // 【关键修复 1】确保在数据加载后执行
             if (!this.data?.entries || this.data.entries.length === 0) {
-                console.warn('[AutoFix] 暂无条目数据，跳过修复');
-                return;
+                console.warn('[AutoFix] 暂无条目数据');
+                return 0;
             }
             
-            // 【关键修复 2】获取远程图片列表（带重试）
+            // 获取图片列表（带重试）
             let imageList = [];
-            let retryCount = 0;
-            while (retryCount < 3) {
+            for (let i = 0; i < 3; i++) {
                 try {
                     imageList = await this.githubStorage.getImageList();
-                    if (imageList && imageList.length > 0) break;
-                    console.warn(`[AutoFix] 获取图片列表为空，重试 ${retryCount + 1}/3...`);
+                    if (imageList.length > 0) break;
                     await new Promise(r => setTimeout(r, 1000));
-                    retryCount++;
-                } catch (e) {
-                    console.error('[AutoFix] 获取图片列表失败:', e);
-                    retryCount++;
-                }
+                } catch (e) { /* 忽略 */ }
             }
             
             if (!imageList || imageList.length === 0) {
-                console.warn('[AutoFix] ❌ 无法获取远程图片列表，请检查：');
-                console.warn('  - GitHub Token 是否有效');
-                console.warn('  - 仓库中是否存在 wiki-data/images/ 目录');
-                return;
+                console.error('[AutoFix] ❌ 无法获取远程图片列表');
+                return 0;
             }
             
             console.log(`[AutoFix] 获取到 ${imageList.length} 个远程图片`);
             
-            // 【关键修复 3】建立文件名索引（支持多种可能的命名格式）
-            const imageSet = new Set(imageList);
-            
-            // 也建立去掉路径的索引（防止路径不匹配）
-            const imageBaseNames = new Set(imageList.map(name => {
-                const parts = name.split('/');
-                return parts[parts.length - 1];
-            }));
+            // 【关键修复】使用与手动代码完全一致的简单匹配逻辑
+            const imageSet = new Set(imageList.map(p => p.split('/').pop()));
             
             let fixedCount = 0;
-            let checkedCount = 0;
             
-            // 【关键修复 4】遍历所有条目和版本
-            this.data.entries.forEach((entry, entryIdx) => {
+            this.data.entries.forEach(entry => {
                 if (!entry.versions) return;
                 
-                entry.versions.forEach((version, verIdx) => {
-                    checkedCount++;
-                    
-                    // 确保 images 对象存在且为对象类型
-                    if (!version.images || typeof version.images !== 'object') {
-                        version.images = { avatar: null, card: null, cover: null };
+                entry.versions.forEach(v => {
+                    // 确保 images 对象存在（与手动代码一致）
+                    if (!v.images || typeof v.images !== 'object') {
+                        v.images = { avatar: null, card: null, cover: null };
                     }
                     
-                    // 定义可能的文件名格式（兼容多种命名规则）
-                    const possiblePatterns = [
-                        `${entry.id}_${version.vid}_avatar.jpg`,
-                        `${entry.id}_${version.vid}_card.jpg`, 
-                        `${entry.id}_${version.vid}_cover.jpg`,
-                        // 兼容旧版可能的不同分隔符
-                        `${entry.id}-${version.vid}-avatar.jpg`,
-                        `${entry.id}-${version.vid}-card.jpg`,
-                        `${entry.id}-${version.vid}-cover.jpg`
-                    ];
+                    // 预期的文件名（与手动代码完全一致）
+                    const files = {
+                        avatar: `${entry.id}_${v.vid}_avatar.jpg`,
+                        card: `${entry.id}_${v.vid}_card.jpg`,
+                        cover: `${entry.id}_${v.vid}_cover.jpg`
+                    };
                     
+                    // 检查每个类型（与手动代码一致的简单逻辑）
                     ['avatar', 'card', 'cover'].forEach(type => {
-                        const expectedFile = `${entry.id}_${version.vid}_${type}.jpg`;
-                        const altFile = `${entry.id}-${version.vid}-${type}.jpg`;
+                        const current = v.images[type];
                         
-                        // 检查当前是否已有值（且不是 base64）
-                        const currentVal = version.images[type];
-                        if (currentVal && !currentVal.startsWith('data:') && !currentVal.startsWith('blob:')) {
-                            // 已有有效值，跳过
-                            return;
-                        }
-                        
-                        // 匹配远程文件（检查多种可能）
-                        let matchedFile = null;
-                        if (imageSet.has(expectedFile) || imageBaseNames.has(expectedFile)) {
-                            matchedFile = expectedFile;
-                        } else if (imageSet.has(altFile) || imageBaseNames.has(altFile)) {
-                            matchedFile = altFile;
-                        } else {
-                            // 模糊匹配：查找包含 entry.id 和 version.vid 的图片
-                            const fuzzyMatch = imageList.find(name => {
-                                const baseName = name.split('/').pop();
-                                return baseName.includes(entry.id) && 
-                                    baseName.includes(version.vid) && 
-                                    baseName.includes(type);
-                            });
-                            if (fuzzyMatch) matchedFile = fuzzyMatch.split('/').pop();
-                        }
-                        
-                        if (matchedFile) {
-                            version.images[type] = `{{IMG:${matchedFile}}`;
-                            console.log(`[AutoFix] ✅ ${entry.code} -> ${matchedFile}`);
-                            fixedCount++;
+                        // 只有空值、data: 或 blob: 才需要修复（避免覆盖已有 URL）
+                        if (!current || current.startsWith('data:') || current.startsWith('blob:')) {
+                            if (imageSet.has(files[type])) {
+                                v.images[type] = `{{IMG:${files[type]}}`;
+                                console.log(`[AutoFix] ✅ ${entry.code} -> ${files[type]}`);
+                                fixedCount++;
+                            }
                         }
                     });
                     
-                    // 同步旧版 image 字段（用于详情页显示）
-                    version.image = version.images?.card || version.images?.avatar || version.images?.cover || version.image;
+                    // 同步旧版 image 字段
+                    v.image = v.images?.card || v.images?.avatar || v.images?.cover || v.image;
                 });
             });
             
-            console.log(`[AutoFix] 检查了 ${checkedCount} 个版本，建立了 ${fixedCount} 个引用`);
+            console.log(`[AutoFix] 建立了 ${fixedCount} 个引用`);
             
             if (fixedCount > 0) {
-                // 立即解析为完整 URL
+                // 解析为完整 URL
                 this.resolveImageReferences();
                 
-                // 刷新当前视图
-                const currentTarget = this.data.currentTarget || 'home';
-                this.router(currentTarget, false);
+                // 刷新显示
+                setTimeout(() => {
+                    this.router(this.data.currentTarget || 'home', false);
+                }, 100);
                 
-                this.showToast(`已自动修复 ${fixedCount} 个图片引用`, 'success');
-                
-                // 【可选】自动保存（如果处于后台模式）
+                // 后台模式自动保存（延迟避免冲突）
                 if (this.runMode === 'backend' && this.backendLoggedIn) {
-                    console.log('[AutoFix] 后台模式 detected，准备自动保存...');
-                    // 延迟保存，避免冲突
-                    setTimeout(() => {
-                        this.saveDataAtomic().then(() => {
-                            console.log('[AutoFix] ✅ 自动保存成功');
-                        }).catch(e => {
-                            console.error('[AutoFix] ❌ 自动保存失败:', e);
-                        });
-                    }, 2000);
-                } else {
-                    console.log('[AutoFix] ℹ️ 前台模式，请手动进入后台保存以永久生效');
+                    setTimeout(async () => {
+                        try {
+                            await this.saveDataAtomic();
+                            console.log('[AutoFix] ✅ 已自动保存到 GitHub');
+                        } catch (e) {
+                            console.error('[AutoFix] 自动保存失败:', e);
+                        }
+                    }, 3000);
                 }
             } else {
-                console.warn('[AutoFix] ⚠️ 未匹配到任何图片，可能原因：');
-                console.warn('  1. 图片文件名格式不符合 {entryId}_{versionId}_{type}.jpg');
-                console.warn('  2. 图片未上传到仓库');
-                console.warn('  3. entry.id 或 version.vid 格式异常');
+                console.warn('[AutoFix] ⚠️ 未匹配到任何图片，请检查文件名格式');
             }
             
             return fixedCount;
             
         } catch (e) {
-            console.error('[AutoFix] 💥 严重错误:', e);
-            this.showToast('图片修复失败: ' + e.message, 'error');
+            console.error('[AutoFix] 💥 错误:', e);
             return 0;
         }
     },
@@ -2302,6 +2250,81 @@ Object.assign(window.app, {
         }
         
         container.appendChild(clone);
+        setTimeout(() => {
+            const settingsContainer = document.getElementById('settings-container') || document.getElementById('main-container');
+            if (!settingsContainer || document.getElementById('repair-images-section')) return;
+            
+            const repairSection = document.createElement('div');
+            repairSection.id = 'repair-images-section';
+            repairSection.className = 'mt-8 p-6 bg-amber-50 border-2 border-amber-200 rounded-xl';
+            repairSection.innerHTML = `
+                <h3 class="font-bold text-lg text-amber-800 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-images"></i> 图片引用修复
+                </h3>
+                <p class="text-sm text-amber-700 mb-4">
+                    如果导入后图片不显示，或图片显示为破损图标，可点击以下按钮自动重建图片引用。
+                    此操作会扫描远程仓库中的所有图片，并与本地词条进行匹配。
+                </p>
+                <div class="flex gap-3">
+                    <button id="btn-repair-images" class="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-wrench"></i> 立即修复引用
+                    </button>
+                    <button id="btn-save-after-repair" class="flex-1 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition flex items-center justify-center gap-2 hidden">
+                        <i class="fa-solid fa-save"></i> 保存修复结果
+                    </button>
+                </div>
+                <div id="repair-result-text" class="mt-3 text-sm text-gray-600 hidden"></div>
+            `;
+            
+            settingsContainer.appendChild(repairSection);
+            
+            // 绑定按钮事件
+            document.getElementById('btn-repair-images').onclick = async function() {
+                const btn = this;
+                const saveBtn = document.getElementById('btn-save-after-repair');
+                const resultText = document.getElementById('repair-result-text');
+                
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 正在修复...';
+                resultText.classList.remove('hidden');
+                resultText.textContent = '正在获取远程图片列表...';
+                
+                try {
+                    const fixed = await app.autoFixImageReferences();
+                    
+                    if (fixed > 0) {
+                        resultText.innerHTML = `<span class="text-green-600 font-medium">✅ 成功建立 ${fixed} 个图片引用</span>`;
+                        btn.innerHTML = '<i class="fa-solid fa-check"></i> 修复完成';
+                        
+                        // 如果是后台模式，显示保存按钮
+                        if (app.runMode === 'backend') {
+                            saveBtn.classList.remove('hidden');
+                        }
+                    } else {
+                        resultText.innerHTML = `<span class="text-amber-600">⚠️ 未找到需要修复的图片引用</span><br><span class="text-xs text-gray-500">可能原因：1. 图片未上传到仓库 2. 文件名不匹配（期望格式：{entryId}_{versionId}_card.jpg）</span>`;
+                        btn.innerHTML = '<i class="fa-solid fa-triangle-exclamation"></i> 未匹配';
+                    }
+                } catch (e) {
+                    resultText.innerHTML = `<span class="text-red-600">❌ 修复失败: ${e.message}</span>`;
+                    btn.innerHTML = '<i class="fa-solid fa-times"></i> 重试';
+                    btn.disabled = false;
+                }
+            };
+            
+            document.getElementById('btn-save-after-repair').onclick = async function() {
+                if (confirm('确定将修复后的图片引用保存到 GitHub？')) {
+                    this.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> 保存中...';
+                    try {
+                        await app.saveDataAtomic();
+                        alert('✅ 已保存！图片引用已永久写入 GitHub。');
+                        this.classList.add('hidden');
+                    } catch (e) {
+                        alert('❌ 保存失败: ' + e.message);
+                        this.innerHTML = '<i class="fa-solid fa-save"></i> 重试保存';
+                    }
+                }
+            };
+        }, 100); // 延迟确保 DOM 已渲染
         
         // 【新增】安全图片修复工具区域（后台模式显示）
         if (this.runMode === 'backend') {
