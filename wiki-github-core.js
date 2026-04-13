@@ -1238,6 +1238,10 @@ Object.assign(window.app, {
         if (!this.data.timelineNodes) {
             this.data.timelineNodes = [];
         }
+        if (type === 'non-character') {
+            this._injectSettingCardStyles(); // 确保样式注入
+            return this.renderSettingsGrouped(container);
+        }
         const tpl = document.getElementById('tpl-list');
         if (!tpl) return;
         
@@ -1299,6 +1303,364 @@ Object.assign(window.app, {
         }
         
         container.appendChild(clone);
+    },
+    // ========== 设定栏与目录样式（同步本地版） ==========
+    /**
+     * 获取设定类型显示标签
+     */
+    getSettingTypeLabel(type) {
+        const labels = {
+            'world': '世界设定',
+            'document': '特殊文献',
+            'art': '绘画/图片',
+            'faction': '阵营',
+            'custom': '自定义'
+        };
+        return labels[type] || type;
+    },
+
+    /**
+     * 获取设定类型图标
+     */
+    getSettingTypeIcon(type) {
+        const icons = {
+            'world': 'fa-globe',
+            'document': 'fa-scroll',
+            'art': 'fa-palette',
+            'faction': 'fa-shield-halved',
+            'custom': 'fa-folder'
+        };
+        return icons[type] || 'fa-folder';
+    },
+
+    /**
+     * 【核心】创建设定卡片（支持无图紧凑模式）
+     * @param {Object} entry - 设定词条
+     * @param {Object} version - 版本数据
+     * @param {Object} options - 配置项 { compact: boolean, isCompactList: boolean }
+     */
+    createSettingCard(entry, version, options = {}) {
+        const { compact = false, isCompactList = false } = options;
+        
+        const div = document.createElement('div');
+        
+        // 处理图片引用（适配 GitHub 版 {{IMG:}} 格式）
+        let img = version.images?.card || version.images?.avatar || version.image || '';
+        if (img && img.startsWith('{{IMG:') && this.githubStorage?.config?.owner) {
+            const match = img.match(/\{\{IMG:(.+?)\}\}/);
+            if (match) {
+                const { owner, repo, branch, dataPath } = this.githubStorage.config;
+                img = `https://raw.githubusercontent.com/${owner}/${repo}/${branch}/${dataPath || 'wiki-data'}/images/${encodeURIComponent(match[1])}`;
+            }
+        }
+        const hasImage = img && (img.startsWith('data:') || img.startsWith('blob:') || img.startsWith('http'));
+        
+        // 标记是否有图，供布局使用
+        div.dataset.hasImage = hasImage ? 'true' : 'false';
+        
+        // 样式类：无图使用 compact 紧凑样式
+        let className = 'bg-white rounded-lg border border-gray-200 p-3 cursor-pointer hover:shadow-md transition hover:border-indigo-300 flex flex-col relative group';
+        if (!hasImage && compact) {
+            className += ' setting-card-compact';
+        }
+        div.className = className;
+        
+        // 点击跳转
+        div.onclick = () => this.openEntry(entry.id);
+        
+        // 删除按钮（仅后台模式显示）
+        if (this.runMode === 'backend') {
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'absolute -top-2 -right-2 w-7 h-7 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow-lg z-20 transition-transform hover:scale-110 border-2 border-white text-xs';
+            deleteBtn.title = `删除设定 ${entry.code}`;
+            deleteBtn.innerHTML = '<i class="fa-solid fa-trash-can"></i>';
+            deleteBtn.onclick = async (e) => {
+                e.stopPropagation();
+                const confirmed = await this.showConfirmDialog({
+                    title: '删除确认',
+                    message: `确定删除设定【${version?.title || entry.code}】(${entry.code})？`,
+                    confirmText: '删除',
+                    cancelText: '取消',
+                    type: 'danger'
+                });
+                if (confirmed) this.deleteEntry(entry.id);
+            };
+            div.appendChild(deleteBtn);
+        }
+        
+        // 图片区域（有图时显示）
+        let imageHtml = '';
+        if (hasImage) {
+            imageHtml = `
+                <div class="aspect-[3/2] bg-gray-100 rounded-lg mb-3 overflow-hidden flex items-center justify-center shrink-0">
+                    <img src="${img}" class="w-full h-full object-cover" loading="lazy" 
+                        onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\\'fa-solid fa-image text-gray-300 text-2xl\\'></i>'">
+                </div>
+            `;
+        }
+        
+        div.innerHTML = `
+            ${imageHtml}
+            <div class="flex items-center justify-between min-h-[24px] ${!hasImage ? 'mb-1' : ''}">
+                <h4 class="font-bold text-sm text-gray-800 truncate flex-1">${version.title || '未命名'}</h4>
+                <span class="text-[10px] text-gray-400 font-mono ml-2">${entry.code}</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1 line-clamp-2">${version.subtitle || ''}</p>
+            ${!hasImage ? '<div class="flex-1"></div>' : ''}
+        `;
+        
+        return div;
+    },
+
+    /**
+     * 【核心】分组渲染设定列表（主设定栏页面）
+     */
+    renderSettingsGrouped(container) {
+        const tpl = document.getElementById('tpl-list');
+        const clone = tpl.content.cloneNode(true);
+        
+        // 获取容器并修改布局为 Grid（支持无图并排）
+        const masonry = clone.querySelector('#masonry-container');
+        if (masonry) {
+            masonry.innerHTML = '';
+            masonry.className = 'max-w-7xl mx-auto pb-20 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4';
+        }
+        
+        const countBadge = clone.querySelector('#list-count');
+        const title = clone.querySelector('#list-title');
+        
+        if (title) title.textContent = '设定';
+        
+        container.appendChild(clone);
+        
+        const wrapper = masonry || container;
+        
+        // 获取所有设定词条（GitHub 版不过滤 future，不过滤时间轴）
+        const settings = this.data.entries.filter(e => e.type === 'non-character');
+        if (countBadge) countBadge.textContent = settings.length;
+        
+        if (settings.length === 0) {
+            wrapper.innerHTML = '<div class="col-span-full text-center py-10 text-gray-400">暂无设定数据</div>';
+            return;
+        }
+        
+        // 智能分组：自定义目录按 customSettingType 分散归类
+        const groups = {};
+        const typeOrder = ['world', 'document', 'art', 'faction']; // custom 单独处理
+        
+        typeOrder.forEach(t => {
+            groups[t] = { title: this.getSettingTypeLabel(t), icon: this.getSettingTypeIcon(t), type: t, items: [] };
+        });
+        
+        settings.forEach(entry => {
+            let type = entry.settingType || 'world';
+            
+            // 【关键】自定义目录按名称分散，不再全部塞入"自定义"
+            if (type === 'custom' && entry.customSettingType && entry.customSettingType.trim()) {
+                const customKey = `custom-${entry.customSettingType.trim()}`;
+                if (!groups[customKey]) {
+                    groups[customKey] = { 
+                        title: entry.customSettingType.trim(), 
+                        icon: 'fa-folder-open', 
+                        type: 'custom',
+                        items: [] 
+                    };
+                }
+                groups[customKey].items.push(entry);
+            } else {
+                if (!groups[type]) {
+                    groups[type] = { title: this.getSettingTypeLabel(type), icon: this.getSettingTypeIcon(type), type: type, items: [] };
+                }
+                groups[type].items.push(entry);
+            }
+        });
+        
+        // 按预设顺序 + 自定义目录排序
+        const sortedKeys = [
+            ...typeOrder,
+            ...Object.keys(groups).filter(k => k.startsWith('custom-')).sort()
+        ].filter(key => groups[key] && groups[key].items.length > 0);
+        
+        // 渲染每个分类
+        sortedKeys.forEach(key => {
+            const group = groups[key];
+            if (!group || group.items.length === 0) return;
+            
+            // 创建分类区域
+            const section = document.createElement('div');
+            section.className = 'col-span-full mb-6'; // 标题跨整行
+            
+            section.innerHTML = `
+                <div class="setting-category-header flex justify-between items-center mb-4 pb-2 border-b-2 border-gray-200">
+                    <div class="setting-category-title flex items-center gap-2">
+                        <i class="fa-solid ${group.icon} text-indigo-600 text-lg"></i>
+                        <span class="text-lg font-bold text-gray-800">${group.title}</span>
+                        <span class="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">${group.items.length}个</span>
+                    </div>
+                    <button onclick="app.viewSettingCategory('${key}')" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium flex items-center gap-1 px-3 py-1 rounded-lg hover:bg-indigo-50 transition">
+                        更多 <i class="fa-solid fa-chevron-right text-xs"></i>
+                    </button>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4" id="setting-group-${key.replace(/[^a-zA-Z0-9]/g, '-')}">
+                </div>
+            `;
+            
+            wrapper.appendChild(section);
+            
+            const grid = section.querySelector(`#setting-group-${key.replace(/[^a-zA-Z0-9]/g, '-')}`);
+            
+            // 【优化】无图卡片紧凑布局：收集所有卡片，根据是否有图决定布局
+            const cardElements = [];
+            group.items.forEach(entry => {
+                const version = this.getVisibleVersion(entry) || entry.versions?.[0];
+                if (!version) return;
+                
+                const card = this.createSettingCard(entry, version, { compact: true, isCompactList: true });
+                cardElements.push({ card, hasImage: card.dataset.hasImage === 'true' });
+            });
+            
+            // 应用布局：两个无图卡片并排（各占 1 格），有图卡片占 1 格但在大屏可能占更多
+            cardElements.forEach((item, index) => {
+                if (!item.hasImage) {
+                    item.card.classList.add('col-span-1');
+                    // 如果是连续的无图卡片，让它们自然并排（在 sm:grid-cols-2 下自动并排）
+                    if (index % 2 === 0 && cardElements[index + 1] && !cardElements[index + 1].hasImage) {
+                        // 标记为可以并排，CSS 已处理
+                        item.card.classList.add('setting-card-no-image');
+                    }
+                } else {
+                    // 有图卡片在移动端占1格，在 lg 以上占1格（与无图一致，但内部有图）
+                    item.card.classList.add('col-span-1');
+                }
+                grid.appendChild(item.card);
+            });
+        });
+    },
+
+    /**
+     * 查看特定设定分类详情页
+     */
+    viewSettingCategory(type) {
+        const container = document.getElementById('main-container');
+        if (!container) return;
+        
+        container.innerHTML = '';
+        
+        // 获取该分类下的所有设定
+        const settings = this.data.entries.filter(e => {
+            if (e.type !== 'non-character') return false;
+            if (type.startsWith('custom-') && e.settingType === 'custom') {
+                return e.customSettingType === type.replace('custom-', '');
+            }
+            return e.settingType === type;
+        });
+        
+        if (settings.length === 0) {
+            container.innerHTML = `
+                <div class="h-full overflow-y-auto p-4 fade-in">
+                    <div class="max-w-7xl mx-auto">
+                        <button onclick="app.router('non-characters')" class="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm">
+                            <i class="fa-solid fa-arrow-left"></i> 返回设定
+                        </button>
+                        <div class="text-center py-20 text-gray-400">
+                            <i class="fa-solid fa-folder-open text-4xl mb-4 opacity-50"></i>
+                            <p>该目录下暂无设定词条</p>
+                        </div>
+                    </div>
+                </div>`;
+            return;
+        }
+        
+        // 按标题排序（GitHub 版无时间轴，不区分时间状态）
+        const sorted = settings.map(entry => {
+            const version = this.getVisibleVersion(entry) || entry.versions[0];
+            return { entry, version };
+        }).sort((a, b) => (a.version?.title || '').localeCompare(b.version?.title || ''));
+        
+        // 构建页面
+        const wrapper = document.createElement('div');
+        wrapper.className = 'h-full overflow-y-auto p-4 fade-in';
+        
+        const groupTitle = type.startsWith('custom-') ? type.replace('custom-', '') : this.getSettingTypeLabel(type);
+        const groupIcon = type.startsWith('custom-') ? 'fa-folder-open' : this.getSettingTypeIcon(type);
+        
+        wrapper.innerHTML = `
+            <div class="max-w-7xl mx-auto mb-6">
+                <button onclick="app.router('non-characters')" class="mb-4 text-gray-600 hover:text-gray-900 flex items-center gap-1 text-sm">
+                    <i class="fa-solid fa-arrow-left"></i> 返回设定
+                </button>
+                <h2 class="text-2xl font-bold text-gray-800 flex items-center gap-2">
+                    <i class="fa-solid ${groupIcon} text-indigo-600"></i>
+                    ${groupTitle}
+                    <span class="text-sm font-normal text-gray-500 bg-gray-100 px-3 py-1 rounded-full">${sorted.length}个</span>
+                </h2>
+            </div>
+        `;
+        
+        // 使用 Grid 布局，无图卡片紧凑排列
+        const grid = document.createElement('div');
+        grid.className = 'max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-20';
+        
+        // 同样应用无图优化布局
+        const cardElements = [];
+        sorted.forEach(({ entry, version }) => {
+            const card = this.createSettingCard(entry, version, { compact: true });
+            cardElements.push({ card, hasImage: card.dataset.hasImage === 'true' });
+        });
+        
+        cardElements.forEach((item, index) => {
+            if (!item.hasImage) {
+                item.card.classList.add('col-span-1');
+                if (index % 2 === 0 && cardElements[index + 1] && !cardElements[index + 1].hasImage) {
+                    item.card.classList.add('setting-card-no-image');
+                }
+            } else {
+                item.card.classList.add('col-span-1');
+            }
+            grid.appendChild(item.card);
+        });
+        
+        wrapper.appendChild(grid);
+        container.appendChild(wrapper);
+        
+        // 注入必要 CSS（确保无图卡片样式）
+        this._injectSettingCardStyles();
+    },
+
+    /**
+     * 注入设定卡片样式（无图优化）
+     */
+    _injectSettingCardStyles() {
+        if (document.getElementById('github-setting-card-styles')) return;
+        
+        const style = document.createElement('style');
+        style.id = 'github-setting-card-styles';
+        style.textContent = `
+            .setting-card-compact {
+                padding: 0.75rem;
+                min-height: 80px;
+            }
+            .setting-card-compact .aspect-\\[3\\/2\\] {
+                display: none;
+            }
+            .setting-card-no-image {
+                /* 无图卡片特定样式，如需边框或背景色可在此添加 */
+            }
+            .setting-category-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 1rem;
+                padding-bottom: 0.5rem;
+                border-bottom: 2px solid #e5e7eb;
+            }
+            .setting-category-title {
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+            }
+        `;
+        document.head.appendChild(style);
     },
 
     // 【新增】根据时间轴获取过滤后的条目
@@ -5003,7 +5365,7 @@ compressImageIfNeeded: function(dataUrl, maxWidth = 1920, maxHeight = 1080, qual
 
     saveHomeContent() {
         this.saveData();
-        this.showToast('首页内容已保存', 'success');
+        this.showToast('首页内容已保存，请进入控制台确认进度并验证是否成功', 'success');
     },
     // 【新增】设置页面专用的保存方法
     async saveSettingsData() {
